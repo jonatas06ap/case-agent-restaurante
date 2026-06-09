@@ -1,0 +1,2641 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Dionisio CRM - Case Mock API",
+        "version": "1.0.0",
+        "description": "\n# Case Mock API\n\nAPI mockada para o case tecnico do **agente assistente do Dionisio**. Expoe\noperacoes em varios dominios \u2014 **Clientes**, **Reservas**, **Pedidos**, **Cupons**,\n**Promocoes**, **Delivery**, **iFood**, **Loja** e **Analytics** \u2014 com dados\nsinteticos realistas. O objetivo e que o agente do candidato consuma estas\noperacoes em linguagem natural.\n\n## Autenticacao e isolamento por candidato\n\nToda chamada (exceto a documentacao) exige:\n\n```\nAuthorization: Bearer <sua-apiKey>\n```\n\nA apiKey resolve internamente para um **storeId** unico do candidato. Voce\n**nunca** envia o storeId \u2014 ele sai da key. Assim cada candidato tem um mundo\nisolado, seedado de forma deterministica (mesma key => mesmos dados).\n\n## Operacoes destrutivas \u26a0\ufe0f\n\nAlgumas operacoes sao irreversiveis (cancelar/remarcar reserva). Estao marcadas\ncom \u26a0\ufe0f e `x-destructive: true`. Toda chamada e auditada (incluindo as\ndestrutivas).\n        ",
+        "contact": {
+            "name": "Dionisio",
+            "email": "matheus@odionisio.com"
+        }
+    },
+    "servers": [
+        {
+            "url": "https://dionisio-crm.web.app",
+            "description": "Production"
+        },
+        {
+            "url": "https://dionisio-crm-dev.web.app",
+            "description": "Development"
+        }
+    ],
+    "tags": [
+        {
+            "name": "Clientes",
+            "description": "Consulta e gestao de clientes"
+        },
+        {
+            "name": "Reservas",
+            "description": "Consulta e gestao de reservas"
+        },
+        {
+            "name": "Pedidos",
+            "description": "Operacoes de Pedidos"
+        },
+        {
+            "name": "Cupons",
+            "description": "Operacoes de Cupons"
+        },
+        {
+            "name": "Promo\u00e7\u00f5es",
+            "description": "Operacoes de Promo\u00e7\u00f5es"
+        },
+        {
+            "name": "Delivery",
+            "description": "Operacoes de Delivery"
+        },
+        {
+            "name": "iFood",
+            "description": "Operacoes de iFood"
+        },
+        {
+            "name": "Loja",
+            "description": "Operacoes de Loja"
+        },
+        {
+            "name": "Analytics",
+            "description": "Operacoes de Analytics"
+        }
+    ],
+    "paths": {
+        "/api/case-mock/clients": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Lista clientes",
+                "operationId": "clients.list",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Busca por nome ou telefone"
+                    },
+                    {
+                        "name": "groupId",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Filtra por grupo"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pagina de clientes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "limit": {
+                                            "type": "integer"
+                                        },
+                                        "offset": {
+                                            "type": "integer"
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Client"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Cria um cliente",
+                "operationId": "clients.create",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "phone"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "description": "So digitos; unico por loja"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "cpf": {
+                                        "type": "string"
+                                    },
+                                    "gender": {
+                                        "type": "string",
+                                        "enum": [
+                                            "masc",
+                                            "fem"
+                                        ]
+                                    },
+                                    "notes": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Criado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Client"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/ConflictError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/clients/search": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Busca clientes por telefone ou nome",
+                "operationId": "clients.search",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "phone",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Resultados",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Client"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/clients/top-spenders": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Clientes que mais gastaram",
+                "operationId": "clients.topSpenders",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "month",
+                                "all"
+                            ],
+                            "default": "month"
+                        }
+                    },
+                    {
+                        "name": "minSpent",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Gasto minimo (em reais)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ranking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "period": {
+                                            "type": "string"
+                                        },
+                                        "minSpent": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "client": {
+                                                        "$ref": "#/components/schemas/Client"
+                                                    },
+                                                    "spent": {
+                                                        "type": "integer"
+                                                    },
+                                                    "couponsUsed": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/clients/inactive": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Clientes sem visita ha N dias",
+                "operationId": "clients.inactive",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "days",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 60
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Clientes inativos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "days": {
+                                            "type": "integer"
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "client": {
+                                                        "$ref": "#/components/schemas/Client"
+                                                    },
+                                                    "lastVisitAt": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "nullable": true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/clients/{clientId}": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Detalhe de um cliente",
+                "operationId": "clients.get",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "clientId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cliente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Client"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Atualiza campos de um cliente",
+                "operationId": "clients.update",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "clientId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "phone": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "cpf": {
+                                        "type": "string"
+                                    },
+                                    "gender": {
+                                        "type": "string",
+                                        "enum": [
+                                            "masc",
+                                            "fem"
+                                        ]
+                                    },
+                                    "notes": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Client"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/clients/{clientId}/insights": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Metricas derivadas do cliente",
+                "operationId": "clients.insights",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "clientId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Insights",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClientInsights"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/clients/{clientId}/reservations": {
+            "get": {
+                "tags": [
+                    "Clientes"
+                ],
+                "summary": "Reservas de um cliente",
+                "operationId": "clients.reservations",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "clientId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reservas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Reservation"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/reservations": {
+            "get": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "Lista reservas",
+                "operationId": "reservations.list",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "2026-06-03"
+                        },
+                        "description": "YYYY-MM-DD"
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/ReservationStatus"
+                        }
+                    },
+                    {
+                        "name": "clientId",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reservas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Reservation"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "Cria uma reserva",
+                "operationId": "reservations.create",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "clientId",
+                                    "start",
+                                    "adults"
+                                ],
+                                "properties": {
+                                    "clientId": {
+                                        "type": "string"
+                                    },
+                                    "start": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "description": "Inicio (timestamp ms)"
+                                    },
+                                    "adults": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                    },
+                                    "children": {
+                                        "type": "integer"
+                                    },
+                                    "areaId": {
+                                        "type": "string",
+                                        "enum": [
+                                            "area_salao",
+                                            "area_varanda",
+                                            "area_mezanino"
+                                        ]
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Criada (status pending)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reservation"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/reservations/availability": {
+            "get": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "Disponibilidade por slot numa data",
+                "operationId": "reservations.availability",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "example": "2026-06-03"
+                        },
+                        "description": "YYYY-MM-DD (default: hoje)"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Disponibilidade",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Availability"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/reservations/{id}": {
+            "get": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "Detalhe de uma reserva",
+                "operationId": "reservations.get",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reserva",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reservation"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "Atualiza campos de uma reserva",
+                "operationId": "reservations.update",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "areaId": {
+                                        "type": "string",
+                                        "enum": [
+                                            "area_salao",
+                                            "area_varanda",
+                                            "area_mezanino"
+                                        ]
+                                    },
+                                    "adults": {
+                                        "type": "integer"
+                                    },
+                                    "children": {
+                                        "type": "integer"
+                                    },
+                                    "tableId": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Atualizada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reservation"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/reservations/{id}/confirm": {
+            "post": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "Confirma uma reserva",
+                "operationId": "reservations.confirm",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Confirmada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reservation"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/ConflictError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/reservations/{id}/cancel": {
+            "post": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "\u26a0\ufe0f Cancela uma reserva (irreversivel)",
+                "operationId": "reservations.cancel",
+                "x-destructive": true,
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reasonCode": {
+                                        "$ref": "#/components/schemas/CancellationReasonCode"
+                                    },
+                                    "reasonText": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Cancelada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reservation"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/ConflictError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/reservations/{id}/reschedule": {
+            "post": {
+                "tags": [
+                    "Reservas"
+                ],
+                "summary": "\u26a0\ufe0f Remarca uma reserva para novo horario",
+                "operationId": "reservations.reschedule",
+                "x-destructive": true,
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "start"
+                                ],
+                                "properties": {
+                                    "start": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "description": "Novo inicio (timestamp ms)"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Remarcada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reservation"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/ConflictError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/orders": {
+            "get": {
+                "tags": [
+                    "Pedidos"
+                ],
+                "summary": "Lista pedidos (filtros: date, status, type, clientId, limit, offset).",
+                "operationId": "orders.list",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Pedidos"
+                ],
+                "summary": "Cria pedido (items[{productId,quantity}], type, clientId, paymentMethod).",
+                "operationId": "orders.create",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/orders/stats": {
+            "get": {
+                "tags": [
+                    "Pedidos"
+                ],
+                "summary": "Estatisticas de pedidos no periodo (periodStart, periodEnd em ms).",
+                "operationId": "orders.stats",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/orders/{id}": {
+            "get": {
+                "tags": [
+                    "Pedidos"
+                ],
+                "summary": "Detalhe de um pedido.",
+                "operationId": "orders.get",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/orders/{id}/status": {
+            "patch": {
+                "tags": [
+                    "Pedidos"
+                ],
+                "summary": "Atualiza status do pedido (body: status).",
+                "operationId": "orders.updateStatus",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/orders/{id}/cancel": {
+            "post": {
+                "tags": [
+                    "Pedidos"
+                ],
+                "summary": "\u26a0\ufe0f Cancela um pedido (irreversivel).",
+                "operationId": "orders.cancel",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "x-destructive": true,
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/coupons": {
+            "get": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "Lista cupons (filtro: status).",
+                "operationId": "coupons.list",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "Cria cupom (name, type, benefitText).",
+                "operationId": "coupons.create",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/coupons/{id}/analytics": {
+            "get": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "Metricas do cupom (gerados, usados, taxa de uso).",
+                "operationId": "coupons.analytics",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/coupons/{id}/instances": {
+            "get": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "Lista instancias/codigos do cupom (filtro: state).",
+                "operationId": "coupons.instances",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/coupons/{id}/assign-group": {
+            "post": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "Gera instancias do cupom para cada cliente de um grupo (body: groupId).",
+                "operationId": "coupons.assignGroup",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/coupons/{id}/deactivate": {
+            "post": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "\u26a0\ufe0f Desativa um cupom (irreversivel).",
+                "operationId": "coupons.deactivate",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "x-destructive": true,
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/coupons/{id}": {
+            "get": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "Detalhe de um cupom.",
+                "operationId": "coupons.get",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "Cupons"
+                ],
+                "summary": "Atualiza campos de um cupom.",
+                "operationId": "coupons.update",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/promotions": {
+            "get": {
+                "tags": [
+                    "Promo\u00e7\u00f5es"
+                ],
+                "summary": "Lista promocoes (filtros: status, discountType).",
+                "operationId": "promotions.list",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Promo\u00e7\u00f5es"
+                ],
+                "summary": "Cria promocao (name, discountType, discountValue, validFrom/Until).",
+                "operationId": "promotions.create",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/promotions/{id}/analytics": {
+            "get": {
+                "tags": [
+                    "Promo\u00e7\u00f5es"
+                ],
+                "summary": "Metricas de uso da promocao.",
+                "operationId": "promotions.analytics",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/promotions/{id}": {
+            "get": {
+                "tags": [
+                    "Promo\u00e7\u00f5es"
+                ],
+                "summary": "Detalhe de uma promocao.",
+                "operationId": "promotions.get",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Promo\u00e7\u00f5es"
+                ],
+                "summary": "Atualiza campos de uma promocao.",
+                "operationId": "promotions.update",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Promo\u00e7\u00f5es"
+                ],
+                "summary": "\u26a0\ufe0f Remove uma promocao (irreversivel).",
+                "operationId": "promotions.delete",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "x-destructive": true,
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/delivery/config": {
+            "get": {
+                "tags": [
+                    "Delivery"
+                ],
+                "summary": "Config de delivery (taxas, minimo, agendamento).",
+                "operationId": "delivery.getConfig",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Delivery"
+                ],
+                "summary": "Atualiza config de delivery.",
+                "operationId": "delivery.updateConfig",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/delivery/neighborhoods": {
+            "get": {
+                "tags": [
+                    "Delivery"
+                ],
+                "summary": "Lista bairros atendidos e taxas.",
+                "operationId": "delivery.neighborhoods",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/delivery/pauses/current": {
+            "get": {
+                "tags": [
+                    "Delivery"
+                ],
+                "summary": "Pausa de delivery ativa no momento.",
+                "operationId": "delivery.currentPause",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/delivery/pauses": {
+            "post": {
+                "tags": [
+                    "Delivery"
+                ],
+                "summary": "\u26a0\ufe0f Cria uma pausa de delivery (interrompe pedidos).",
+                "operationId": "delivery.createPause",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "x-destructive": true,
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/delivery/pauses/{id}": {
+            "delete": {
+                "tags": [
+                    "Delivery"
+                ],
+                "summary": "Encerra uma pausa de delivery.",
+                "operationId": "delivery.endPause",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/ifood/merchants": {
+            "get": {
+                "tags": [
+                    "iFood"
+                ],
+                "summary": "Lista merchants iFood da loja.",
+                "operationId": "ifood.merchants",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/ifood/orders": {
+            "get": {
+                "tags": [
+                    "iFood"
+                ],
+                "summary": "Lista pedidos iFood (filtros: date, status, limit, offset).",
+                "operationId": "ifood.list",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/ifood/orders/{id}": {
+            "get": {
+                "tags": [
+                    "iFood"
+                ],
+                "summary": "Detalhe de um pedido iFood.",
+                "operationId": "ifood.get",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/ifood/orders/{id}/confirm": {
+            "post": {
+                "tags": [
+                    "iFood"
+                ],
+                "summary": "Confirma um pedido iFood (PENDING -> CONFIRMED).",
+                "operationId": "ifood.confirm",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/ifood/orders/{id}/dispatch": {
+            "post": {
+                "tags": [
+                    "iFood"
+                ],
+                "summary": "Despacha um pedido iFood para entrega.",
+                "operationId": "ifood.dispatch",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/ifood/orders/{id}/cancel": {
+            "post": {
+                "tags": [
+                    "iFood"
+                ],
+                "summary": "\u26a0\ufe0f Solicita cancelamento de um pedido iFood (irreversivel).",
+                "operationId": "ifood.cancel",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "x-destructive": true,
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/store": {
+            "get": {
+                "tags": [
+                    "Loja"
+                ],
+                "summary": "Dados da loja (nome, endereco, plano, pagamentos).",
+                "operationId": "store.get",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Loja"
+                ],
+                "summary": "Atualiza dados da loja.",
+                "operationId": "store.update",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/store/hours": {
+            "get": {
+                "tags": [
+                    "Loja"
+                ],
+                "summary": "Horarios de funcionamento por dia.",
+                "operationId": "store.getHours",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Loja"
+                ],
+                "summary": "Atualiza horarios (body: workingHours).",
+                "operationId": "store.updateHours",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/store/members": {
+            "get": {
+                "tags": [
+                    "Loja"
+                ],
+                "summary": "Lista membros/equipe e papeis.",
+                "operationId": "store.members",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/store/features": {
+            "get": {
+                "tags": [
+                    "Loja"
+                ],
+                "summary": "Feature flags / integracoes ativas da loja.",
+                "operationId": "store.features",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/analytics/revenue": {
+            "get": {
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Receita no periodo (periodStart, periodEnd em ms) + por dia.",
+                "operationId": "analytics.revenue",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/analytics/orders": {
+            "get": {
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Metricas de pedidos no periodo.",
+                "operationId": "analytics.orders",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/analytics/reservations": {
+            "get": {
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Metricas de reservas no periodo (no-show rate).",
+                "operationId": "analytics.reservations",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/analytics/conversations": {
+            "get": {
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Metricas de conversas (IA vs humano) no periodo.",
+                "operationId": "analytics.conversations",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/analytics/coupon-returns": {
+            "get": {
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Retorno de cupons no periodo (gerados, usados).",
+                "operationId": "analytics.couponReturns",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        },
+        "/api/case-mock/analytics/top-items": {
+            "get": {
+                "tags": [
+                    "Analytics"
+                ],
+                "summary": "Itens mais vendidos no periodo (limit).",
+                "operationId": "analytics.topItems",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/BadRequestError"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/UnauthorizedError"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFoundError"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "description": "Use a apiKey do candidato. Ex.: Authorization: Bearer demo-key"
+            }
+        },
+        "schemas": {
+            "Client": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "storeId": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "cpf": {
+                        "type": "string"
+                    },
+                    "gender": {
+                        "type": "string",
+                        "enum": [
+                            "masc",
+                            "fem"
+                        ]
+                    },
+                    "birthDate": {
+                        "type": "object",
+                        "properties": {
+                            "day": {
+                                "type": "integer"
+                            },
+                            "month": {
+                                "type": "integer"
+                            },
+                            "year": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "clientGroupIds": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "createdAt": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "updatedAt": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "ClientInsights": {
+                "type": "object",
+                "properties": {
+                    "clientId": {
+                        "type": "string"
+                    },
+                    "visitsCount": {
+                        "type": "integer"
+                    },
+                    "noShowCount": {
+                        "type": "integer"
+                    },
+                    "totalSpent": {
+                        "type": "integer"
+                    },
+                    "spentThisMonth": {
+                        "type": "integer"
+                    },
+                    "couponsUsed": {
+                        "type": "integer"
+                    },
+                    "firstVisitAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "nullable": true
+                    },
+                    "lastVisitAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "nullable": true
+                    },
+                    "averageTicket": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "Reservation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "storeId": {
+                        "type": "string"
+                    },
+                    "clientId": {
+                        "type": "string"
+                    },
+                    "areaId": {
+                        "type": "string"
+                    },
+                    "tableId": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "object",
+                        "properties": {
+                            "start": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "end": {
+                                "type": "integer",
+                                "format": "int64"
+                            }
+                        }
+                    },
+                    "partySize": {
+                        "type": "object",
+                        "properties": {
+                            "adults": {
+                                "type": "integer"
+                            },
+                            "children": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/ReservationStatus"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "cancellation": {
+                        "type": "object",
+                        "properties": {
+                            "reasonCode": {
+                                "$ref": "#/components/schemas/CancellationReasonCode"
+                            },
+                            "reasonText": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "createdAt": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "updatedAt": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "Availability": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string"
+                    },
+                    "totalCapacity": {
+                        "type": "integer"
+                    },
+                    "areas": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "capacity": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+                    "slots": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "time": {
+                                    "type": "string",
+                                    "example": "19:30"
+                                },
+                                "capacity": {
+                                    "type": "integer"
+                                },
+                                "booked": {
+                                    "type": "integer"
+                                },
+                                "free": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ReservationStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "awaiting_payment",
+                    "confirmed",
+                    "seated",
+                    "completed",
+                    "cancelled",
+                    "cancelled_by_client",
+                    "cancelled_by_business",
+                    "no_show"
+                ]
+            },
+            "CancellationReasonCode": {
+                "type": "string",
+                "enum": [
+                    "client_changed_mind",
+                    "client_schedule_conflict",
+                    "client_request",
+                    "no_show",
+                    "no_availability",
+                    "business_closed",
+                    "duplicate_reservation",
+                    "other"
+                ]
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "responses": {
+            "UnauthorizedError": {
+                "description": "API key ausente ou invalida",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "NotFoundError": {
+                "description": "Recurso nao encontrado",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "BadRequestError": {
+                "description": "Parametros invalidos",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "ConflictError": {
+                "description": "Conflito de estado (ex.: reserva ja cancelada)",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
