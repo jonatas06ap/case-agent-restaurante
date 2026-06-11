@@ -24,6 +24,7 @@ class ToolCallRecord(BaseModel):
     arguments: dict             # args enviados pelo LLM
     ok: bool                    # True em 2xx; False em erro de API
     summary: str                # resumo curto do retorno ou do erro
+    confirmed: bool | None = None  # None=nao exigia confirmacao; True/False=exigia e foi/nao foi confirmada
 
 
 class ConversationState(BaseModel):

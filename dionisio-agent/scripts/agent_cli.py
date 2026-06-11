@@ -29,6 +29,8 @@ from rag import Retriever  # noqa: E402
 
 console = Console()
 EXIT_WORDS = {"sair", "exit", "quit", "q"}
+# So estas palavras confirmam (design doc §2.5). "ok"/"sim"/"pode ser" NAO confirmam.
+CONFIRM_WORDS = {"confirmar", "confirmo", "sim, confirmo"}
 
 
 def _make_observer(console: Console):
@@ -45,8 +47,28 @@ def _make_observer(console: Console):
                 f"  [{color}][tool][/{color}]     {payload['method']} {payload['path']} "
                 f"-> {payload['summary']}"
             )
+        elif kind == "ambiguity" and payload.get("ambiguous"):
+            console.print("  [dim][ambiguidade] pedido ambiguo -> pedindo esclarecimento[/dim]")
 
     return on_event
+
+
+async def _confirm(plano: str) -> bool:
+    """confirm_callback real: mostra o plano e exige a palavra explicita do operador.
+
+    Confirmacao implicita nao vale: so 'confirmar'/'confirmo'/'sim, confirmo'
+    prosseguem; qualquer outra coisa ("ok", "sim", "pode ser") aborta sem chamar a API.
+    """
+    console.print(f"\n  [yellow]⚠️  Confirmacao necessaria[/yellow]")
+    for line in plano.splitlines():
+        console.print(f"  [yellow]{line}[/yellow]")
+    resp = console.input(
+        "  [yellow]Digite 'confirmar' para prosseguir: [/yellow]"
+    ).strip().lower()
+    approved = resp in CONFIRM_WORDS
+    if not approved:
+        console.print("  [dim]Acao cancelada (sem confirmacao).[/dim]")
+    return approved
 
 
 async def main() -> int:
@@ -71,7 +93,8 @@ async def main() -> int:
 
     async with DionisioClient(api_key=api_key, base_url=base_url) as client:
         agent = Agent(llm=llm, retriever=retriever, client=client,
-                      on_event=_make_observer(console))
+                      on_event=_make_observer(console),
+                      confirm_callback=_confirm)
 
         while True:
             try:

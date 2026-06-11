@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Awaitable, Callable
 from urllib.parse import urlparse
 
 from client import DionisioAPIError, DionisioClient
+from safety.destructive import confirmation_reason, requires_confirmation
 
 from .state import ConversationState, ToolCallRecord
 
@@ -41,8 +43,20 @@ class Executor:
             path = path.replace("{" + name + "}", str(value))
         return path or "/"
 
-    async def run(self, tool_call, fn_map: dict, state: ConversationState) -> str:
-        """Executa um tool_call e devolve a observacao textual (mensagem role:tool)."""
+    async def run(
+        self,
+        tool_call,
+        fn_map: dict,
+        state: ConversationState,
+        confirm_callback: Callable[[str], Awaitable[bool]] | None = None,
+    ) -> str:
+        """Executa um tool_call e devolve a observacao textual (mensagem role:tool).
+
+        Se a operacao exige confirmacao (safety.requires_confirmation), monta o
+        plano em linguagem natural e chama `confirm_callback(plano)` ANTES da
+        chamada HTTP. Sem confirmacao (callback ausente ou negado), nao chama a
+        API: devolve observacao de cancelamento e registra ToolCallRecord(ok=False).
+        """
         fn_name = tool_call.function.name
         entry = fn_map.get(fn_name)
         if entry is None:
@@ -66,6 +80,33 @@ class Executor:
                 (query_args if method == "GET" else body_args)[k] = v
 
         rel_path = self._relative_path(entry["path"], path_args)
+        operation_id = entry["operation_id"]
+
+        # --- barreira de confirmacao (Dia 3), no boundary da tool-call ---
+        confirmed: bool | None = None
+        if requires_confirmation(operation_id):
+            plano = self._build_plan(operation_id, method, rel_path, args)
+            approved = await confirm_callback(plano) if confirm_callback else False
+            confirmed = bool(approved)
+            if not approved:
+                summary = "cancelada (sem confirmacao)"
+                state.actions_taken.append(
+                    ToolCallRecord(
+                        operation_id=operation_id,
+                        method=method,
+                        path=rel_path,
+                        arguments=args,
+                        ok=False,
+                        summary=summary,
+                        confirmed=False,
+                    )
+                )
+                logger.info("tool %s -> NAO confirmada, abortada", fn_name)
+                return (
+                    f"Operacao {operation_id} NAO executada — confirmacao negada/ausente "
+                    f"pelo operador. Nenhuma chamada foi feita a API. Reporte ao operador "
+                    f"que a acao foi cancelada e nao realizada."
+                )
 
         # --- chamada HTTP (erro vira observacao, nunca derruba o turno) ---
         try:
@@ -87,17 +128,37 @@ class Executor:
 
         state.actions_taken.append(
             ToolCallRecord(
-                operation_id=entry["operation_id"],
+                operation_id=operation_id,
                 method=method,
                 path=rel_path,
                 arguments=args,
                 ok=ok,
                 summary=summary,
+                confirmed=confirmed,
             )
         )
         return observation
 
     # ----- helpers ----------------------------------------------------------
+    @staticmethod
+    def _build_plan(operation_id: str, method: str, rel_path: str, args: dict) -> str:
+        """Plano curto e honesto apresentado ao operador antes de executar.
+
+        Cita SO dados ja conhecidos (os args, que vieram do LLM a partir do que a
+        API ja retornou nos passos anteriores) — nao inventa nada. Diz O QUE sera
+        feito (operacao + alvo), o ESCOPO (parametros) e a IRREVERSIBILIDADE/motivo.
+        """
+        reason = confirmation_reason(operation_id)
+        if args:
+            arg_str = ", ".join(f"{k}={v}" for k, v in args.items())
+        else:
+            arg_str = "sem parametros adicionais"
+        return (
+            f"Vou executar: {operation_id} ({method} {rel_path}).\n"
+            f"Parametros: {arg_str}.\n"
+            f"Motivo da confirmacao: {reason}."
+        )
+
     @staticmethod
     def _truncate(text: str) -> str:
         if len(text) <= _MAX_OBSERVATION_CHARS:
