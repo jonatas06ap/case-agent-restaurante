@@ -1,0 +1,9 @@
+{
+  "date": "2023-11-25",
+  "totalCapacity": 40,
+  "areas": [{ "id": "area_salao", "name": "Salão", "capacity": 40 }],
+  "slots": [
+    { "time": "20:00", "capacity": 10, "booked": 4, "free": 6 },
+    { "time": "20:30", "capacity": 10, "booked": 2, "free": 8 }
+  ]
+}

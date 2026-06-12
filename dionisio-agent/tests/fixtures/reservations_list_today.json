@@ -1,0 +1,11 @@
+{
+  "total": 1,
+  "items": [
+    {
+      "id": "resv_hoje_1",
+      "clientId": "cli_555",
+      "duration": { "start": 1700596800000, "end": 1700604000000 },
+      "status": "confirmed"
+    }
+  ]
+}

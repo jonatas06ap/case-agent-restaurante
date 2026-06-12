@@ -1,0 +1,10 @@
+{
+  "period": "month",
+  "minSpent": 500,
+  "total": 3,
+  "items": [
+    { "client": { "id": "cli_ana", "name": "Ana Souza" }, "spent": 800, "couponsUsed": 0 },
+    { "client": { "id": "cli_bruno", "name": "Bruno Lima" }, "spent": 600, "couponsUsed": 2 },
+    { "client": { "id": "cli_carla", "name": "Carla Dias" }, "spent": 520, "couponsUsed": 0 }
+  ]
+}

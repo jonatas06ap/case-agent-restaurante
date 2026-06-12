@@ -1,0 +1,8 @@
+{
+  "total": 2,
+  "groupId": "grp_inactive",
+  "clients": [
+    { "id": "cli_a", "name": "Antônio Reis" },
+    { "id": "cli_b", "name": "Beatriz Nunes" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "name": "Risoto de Funghi", "count": 42, "revenue": 3780 },
+    { "name": "Pizza Margherita", "count": 31, "revenue": 1860 },
+    { "name": "Tiramisù", "count": 20, "revenue": 700 }
+  ]
+}

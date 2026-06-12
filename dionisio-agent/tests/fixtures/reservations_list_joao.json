@@ -1,0 +1,12 @@
+{
+  "total": 1,
+  "items": [
+    {
+      "id": "resv_joao",
+      "clientId": "cli_joao",
+      "duration": { "start": 1700596800000, "end": 1700604000000 },
+      "partySize": { "adults": 2, "children": 0, "total": 2 },
+      "status": "confirmed"
+    }
+  ]
+}

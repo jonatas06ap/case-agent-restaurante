@@ -1,0 +1,17 @@
+{
+  "total": 2,
+  "items": [
+    {
+      "id": "ord_1",
+      "client": { "id": "cli_marina", "name": "Marina Alves" },
+      "items": [{ "name": "Risoto de Funghi", "qty": 1 }],
+      "createdAt": 1700600000000
+    },
+    {
+      "id": "ord_2",
+      "client": { "id": "cli_pedro", "name": "Pedro Rocha" },
+      "items": [{ "name": "Risoto de Funghi", "qty": 2 }],
+      "createdAt": 1700500000000
+    }
+  ]
+}
