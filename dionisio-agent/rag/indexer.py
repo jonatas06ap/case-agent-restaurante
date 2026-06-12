@@ -42,6 +42,10 @@ _OPERATION_HINTS = {
     "coupons.assignGroup": "Distribuir cupons da campanha para um grupo de clientes; "
         "disparar campanha com cupom.",
     "delivery.createPause": "Pausar o delivery e interromper novos pedidos de entrega.",
+    "orders.list":
+        "Pedidos feitos pelos clientes; quem pediu um prato/item num periodo recente.",
+    "analytics.topItems":
+        "Pratos/itens mais pedidos do cardapio; ranking de itens vendidos.",
 }
 _RAG_DIR = Path(__file__).resolve().parent
 _SPEC_PATH = _RAG_DIR / "openapi_spec.json"

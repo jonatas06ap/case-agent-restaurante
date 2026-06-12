@@ -1,7 +1,7 @@
 [project]
 name = "dionisio-agent"
 version = "0.1.0"
-description = "Agente assistente interno do Dionisio (CRM de restaurantes) — Dia 1: client + RAG"
+description = "Agente assistente interno do Dionisio (CRM de restaurantes) — loop ReAct single-agent + RAG"
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27",

@@ -15,7 +15,10 @@ from .state import ConversationState
 
 _SYNTH_INSTRUCTION = (
     "Com base nas observacoes acima, responda agora ao operador em portugues, de forma "
-    "direta, citando os dados reais retornados pela API. Nao chame mais ferramentas."
+    "direta e pratica, no tom de quem trabalha no restaurante. Cite SO os dados que vieram "
+    "das observacoes (numeros, nomes, telefones, horarios) — nao invente nem aproxime. Nao "
+    "use jargao de API na resposta: nada de nomes de operacoes, campos do JSON, status HTTP "
+    "ou 'a API'. Nao chame mais ferramentas."
 )
 
 
