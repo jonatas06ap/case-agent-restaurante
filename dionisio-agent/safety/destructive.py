@@ -70,9 +70,13 @@ def requires_confirmation(operation_id: str) -> bool:
 
 
 def confirmation_reason(operation_id: str) -> str:
-    """Frase curta sobre POR QUE confirma — compoe o plano apresentado ao operador."""
+    """Motivo da confirmacao em LINGUAGEM DE OPERADOR (Dia 6) — compoe o plano.
+
+    A CLASSE (x-destructive / efeito em massa) segue decidida por metadado, igual.
+    Muda so a redacao: nada de "x-destructive" na fala ao operador.
+    """
     if operation_id in _destructive_ops():
-        return "operacao irreversivel (x-destructive)"
+        return "essa acao nao pode ser desfeita"
     if operation_id in MASS_EFFECT_OPS:
-        return "afeta um grupo inteiro de clientes"
+        return "isso afeta um grupo inteiro de clientes de uma vez"
     return ""

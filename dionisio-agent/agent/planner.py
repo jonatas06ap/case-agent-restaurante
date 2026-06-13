@@ -18,9 +18,14 @@ from functools import lru_cache
 from pathlib import Path
 
 from rag.indexer import _deref  # resolve um nivel de $ref no spec
-from rag.retriever import RetrievalResult
+from rag.retriever import OperationDoc, RetrievalResult
+
+from . import calculator
 
 logger = logging.getLogger("dionisio.agent.planner")
+
+# Expansao de dominio (Dia 6): teto de operacoes-irmas injetadas alem do top-k.
+_DOMAIN_EXPANSION_CAP = 15
 
 _SPEC_PATH = Path(__file__).resolve().parent.parent / "rag" / "openapi_spec.json"
 _HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
@@ -57,6 +62,14 @@ adequada antes — nunca chute.
 - Voce so tem acesso as ferramentas (operacoes da API) que foram fornecidas neste turno. \
 Se nenhuma serve, explique a limitacao.
 - Ao montar argumentos, respeite os tipos do schema da ferramenta.
+- Se voce chamar uma ferramenta e receber "ferramenta desconhecida"/"nao existe", voce ERROU \
+o NOME — a capacidade pode existir com outro nome. Olhe a lista de ferramentas deste turno (e \
+as sugestoes que a observacao trouxer) e chame o nome correto. NUNCA conclua que algo e \
+impossivel so porque um nome de ferramenta falhou: so declare impossivel depois de conferir \
+a lista fornecida.
+- CALCULO: para QUALQUER conta — soma, media, percentual, contagem, ordenacao/ranking — use a \
+ferramenta `calcular`. NUNCA calcule "de cabeca" no texto (erra conta e ordem). Cite o numero \
+que a ferramenta devolveu, igual a um dado da API.
 
 ENCADEAMENTO (pedidos multi-step):
 - DECOMPONHA o pedido em passos e execute-os EM ORDEM, esperando a observacao (resposta da \
@@ -81,23 +94,30 @@ correta e dizer que ninguem pediu aquele prato no periodo: lista vazia e um resu
 e completo, nao motivo pra continuar tentando.
 
 PEDIDO IMPOSSIVEL (perguntar ou recusar — nunca fingir):
-- A API do Dionisio cobre clientes, reservas, pedidos, cupons, promocoes, delivery, iFood, \
-loja e analytics. NAO existe nenhum endpoint de comunicacao/notificacao: nao da pra \
-enviar SMS, WhatsApp, e-mail ou "avisar" um cliente. Se o pedido depender disso, diga \
-claramente que essa parte nao e executavel pela API — execute o que for possivel e seja \
-honesto sobre o que ficou de fora. NUNCA diga que notificou/avisou alguem.
-- TAMBEM nao existe nenhum endpoint de cardapio/menu: nao da pra adicionar, remover ou \
-desativar um prato/item do cardapio pela API. O mais proximo e leitura (analytics.topItems, \
-orders). Se o pedido for remover/tirar um prato do cardapio, diga claramente que isso nao e \
-executavel pela API — NUNCA diga que removeu/desativou um prato.
-- Quando um pedido MISTURA partes possiveis e impossiveis (ex: "remove o prato X e avisa quem \
-pediu"), FACA a parte possivel (ex: liste, a partir da API, quem pediu o prato) e RECUSE \
-explicando as partes impossiveis. Agregue o valor que der — entregue a lista ao operador para \
-ele agir manualmente — sem nunca fingir que executou o que a API nao permite.
-- Se uma operacao retornar erro ou nao encontrar dados, explique o que voce tentou, o que \
-encontrou e o que faltaria. Nunca afirme que executou uma acao que falhou ou foi cancelada.
-- Se uma acao foi CANCELADA por falta de confirmacao do operador, reporte que ela NAO foi \
-realizada — nao a descreva como concluida.
+- Voce cuida de clientes, reservas, pedidos, cupons, promocoes, delivery, iFood, loja e \
+relatorios. Voce NAO consegue ENVIAR MENSAGENS/AVISOS aos clientes (SMS, WhatsApp, e-mail, \
+ligacao): nao da pra "avisar", "comunicar" ou "notificar" alguem por aqui. Se o pedido pedir \
+isso, faca o que for possivel e diga, em linguagem simples, que o aviso ao cliente precisa ser \
+feito por fora (no sistema do restaurante / direto com o cliente). NUNCA diga que avisou ou \
+notificou alguem.
+- Voce tambem NAO mexe no CARDAPIO: nao da pra adicionar, remover ou desativar um prato/item. \
+Voce so consegue CONSULTAR o que foi pedido (historico de pedidos, itens mais vendidos). Se \
+pedirem para tirar um prato do cardapio, diga em linguagem simples que isso e feito no sistema \
+do restaurante, nao por aqui — NUNCA diga que removeu ou desativou um prato.
+- Quando um pedido MISTURA o que da e o que nao da (ex: "remove o prato X e avisa quem pediu"), \
+FACA a parte possivel (ex: levante quem pediu o prato) e seja honesto sobre a parte que nao da \
+— entregue o resultado ao operador para ele agir. Nunca finja ter feito o que voce nao consegue.
+- IMPORTANTE — antes de dizer "nao consigo": confira a lista de ferramentas deste turno. Se a \
+operacao existe (listar, atribuir cupom a um grupo, remarcar, cancelar...), USE-A — nao recuse \
+algo que e possivel. So e impossivel comunicacao com cliente e mexer no cardapio; o resto, se \
+estiver na lista, da pra fazer.
+- Se uma operacao der erro ou nao achar dados, explique em linguagem simples o que voce tentou, \
+o que achou e o que faltou. Nunca afirme ter feito uma acao que falhou ou foi cancelada.
+- Se uma acao foi CANCELADA por falta de confirmacao do operador, diga que ela NAO foi feita — \
+nao a descreva como concluida.
+- AO FALAR DE UMA LIMITACAO, fale como operador, nunca como sistema: diga "nao consigo enviar \
+o aviso aos clientes por aqui", NAO "a API nao tem endpoint de notificacao". Nada de "API", \
+"endpoint", "ferramenta", "operacao" ou nome tecnico na fala ao operador.
 
 TIMESTAMPS:
 - Todos os campos de tempo da API sao timestamp em MILISSEGUNDOS (epoch Unix): campos \
@@ -222,19 +242,71 @@ def _build_parameters_schema(op_id: str) -> tuple[dict, dict]:
     return json_schema, locations
 
 
+def _expand_domain_siblings(operations: list[OperationDoc]) -> list[OperationDoc]:
+    """Injeta operacoes-irmas dos dominios tocados, fora do top-k (Dia 6).
+
+    Falso negativo medido (`Context/simulacao.md`): o retrieval roda UMA vez por
+    turno, ancorado no texto ORIGINAL do usuario, e congela a lista de tools. Num
+    pedido multi-step ("desmarque as reservas do dia 19") ele traz `reservations.cancel`
+    mas nao `reservations.list` — a operacao que o agente precisa para *encontrar*
+    as reservas. O LLM emite o nome certo, recebe "ferramenta desconhecida" e conclui
+    que a capacidade nao existe. Aqui garantimos que, tocando um dominio, TODAS as
+    operacoes dele fiquem disponiveis como tool (inclui `reservations.list` e o
+    `coupons.assignGroup` da campanha). Em memoria, a partir do spec local — sem rede,
+    sem reindex. A barreira de confirmacao no executor segue valendo para as destrutivas.
+    """
+    retrieved = {op.operation_id for op in operations}
+    # dominios na ordem de relevancia (operations ja vem ordenado por score)
+    domains: list[str] = []
+    for op in operations:
+        d = op.operation_id.split(".")[0]
+        if d not in domains:
+            domains.append(d)
+
+    by_id = _operations_by_id()
+    extra: list[OperationDoc] = []
+    for domain in domains:
+        for op_id, entry in by_id.items():
+            if len(extra) >= _DOMAIN_EXPANSION_CAP:
+                return extra
+            if op_id in retrieved or op_id.split(".")[0] != domain:
+                continue
+            op = entry["op"]
+            summary = op.get("summary", op_id)
+            extra.append(
+                OperationDoc(
+                    operation_id=op_id,
+                    method=entry["method"],
+                    path=entry["path"],
+                    domain=domain,
+                    destructive=bool(op.get("x-destructive", False)),
+                    summary=summary,
+                    full_text=summary,
+                    score=0.0,
+                )
+            )
+    return extra
+
+
 def build_tools(retrieval: RetrievalResult) -> tuple[list[dict], dict]:
     """Monta as tools (formato OpenAI) e o mapa reverso para o executor.
 
     fn_map[fn_name] = {operation_id, method, path, locations}
     `path` e o path do spec (com prefixo /api/case-mock); o executor remove o prefixo
     que ja esta no base_url do client.
+
+    Alem do top-k recuperado, injeta (a) as operacoes-irmas dos dominios tocados
+    (anti-falso-negativo) e (b) a calculadora local (sempre disponivel).
     """
     tools: list[dict] = []
     fn_map: dict[str, dict] = {}
 
-    for op in retrieval.operations:
+    operations = list(retrieval.operations) + _expand_domain_siblings(retrieval.operations)
+    for op in operations:
         op_id = op.operation_id
         fn_name = op_id.replace(".", "_")  # OpenAI exige ^[a-zA-Z0-9_-]+$
+        if fn_name in fn_map:  # irma ja presente no top-k; nao duplica
+            continue
         parameters, locations = _build_parameters_schema(op_id)
         description = (op.summary or op.full_text or op_id).lstrip("⚠️ ").strip()
 
@@ -254,6 +326,10 @@ def build_tools(retrieval: RetrievalResult) -> tuple[list[dict], dict]:
             "path": op.path,
             "locations": locations,
         }
+
+    # Calculadora local: tool deterministica, sempre presente, despachada sem API.
+    tools.append(calculator.build_tool())
+    fn_map[calculator.TOOL_NAME] = dict(calculator.FN_MAP_ENTRY)
 
     return tools, fn_map
 

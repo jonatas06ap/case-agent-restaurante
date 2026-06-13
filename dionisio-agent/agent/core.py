@@ -98,7 +98,7 @@ class Agent:
         # barreira passou para a confirmacao no executor. Sem isso, as ops
         # destrutivas/de massa nem estariam disponiveis como tool (Tarefas 2 e 4).
         retrieval = await self.retriever.retrieve(
-            user_input, k_operations=5, k_docs=3, exclude_destructive=False
+            user_input, k_operations=8, k_docs=3, exclude_destructive=False
         )
         self._emit("retrieve", {"operations": retrieval.operations, "docs": retrieval.docs})
         tools, fn_map = planner.build_tools(retrieval)

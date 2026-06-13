@@ -20,6 +20,8 @@ from urllib.parse import urlparse
 from client import DionisioAPIError, DionisioClient
 from safety.destructive import confirmation_reason, requires_confirmation
 
+from . import calculator
+from .phrasing import humanize_plan
 from .state import ConversationState, ToolCallRecord
 
 logger = logging.getLogger("dionisio.agent.executor")
@@ -60,7 +62,11 @@ class Executor:
         fn_name = tool_call.function.name
         entry = fn_map.get(fn_name)
         if entry is None:
-            return f"Erro: ferramenta desconhecida '{fn_name}'. Use apenas as ferramentas fornecidas."
+            # Nome errado != capacidade inexistente (Dia 6). Em vez do beco sem
+            # saida, sugere os nomes do MESMO dominio disponiveis neste turno para
+            # o LLM se autocorrigir no proprio turno (ver falsos negativos em
+            # Context/simulacao.md). Sem re-retrieval.
+            return self._unknown_tool_hint(fn_name, fn_map)
 
         # --- parse dos argumentos ---
         raw_args = tool_call.function.arguments or "{}"
@@ -68,6 +74,10 @@ class Executor:
             args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
         except json.JSONDecodeError as e:
             return f"Erro: argumentos invalidos para {fn_name} (JSON malformado: {e})."
+
+        # --- ferramenta LOCAL (calculadora): sem API, sem confirmacao ---
+        if entry.get("local"):
+            return calculator.execute(args)
 
         locations = entry["locations"]
         path_args = {k: v for k, v in args.items() if locations.get(k) == "path"}
@@ -103,9 +113,9 @@ class Executor:
                 )
                 logger.info("tool %s -> NAO confirmada, abortada", fn_name)
                 return (
-                    f"Operacao {operation_id} NAO executada — confirmacao negada/ausente "
-                    f"pelo operador. Nenhuma chamada foi feita a API. Reporte ao operador "
-                    f"que a acao foi cancelada e nao realizada."
+                    f"Acao NAO executada (operacao {operation_id}) — o operador nao "
+                    f"confirmou. Nada foi alterado. Diga ao operador, em linguagem "
+                    f"simples, que a acao foi cancelada e nao realizada."
                 )
 
         # --- chamada HTTP (erro vira observacao, nunca derruba o turno) ---
@@ -144,19 +154,36 @@ class Executor:
     def _build_plan(operation_id: str, method: str, rel_path: str, args: dict) -> str:
         """Plano curto e honesto apresentado ao operador antes de executar.
 
-        Cita SO dados ja conhecidos (os args, que vieram do LLM a partir do que a
-        API ja retornou nos passos anteriores) — nao inventa nada. Diz O QUE sera
-        feito (operacao + alvo), o ESCOPO (parametros) e a IRREVERSIBILIDADE/motivo.
+        Em LINGUAGEM DE RESTAURANTE (Dia 6): nada de operationId, metodo/path HTTP
+        ou nome de campo JSON — o operador leigo nao entende isso. A traducao mora
+        em `agent/phrasing.py` (mapa das 8 operacoes confirmaveis). Cita SO dados ja
+        conhecidos (os args, vindos do que a API ja retornou) — nao inventa nada.
         """
-        reason = confirmation_reason(operation_id)
-        if args:
-            arg_str = ", ".join(f"{k}={v}" for k, v in args.items())
-        else:
-            arg_str = "sem parametros adicionais"
+        return humanize_plan(operation_id, args, confirmation_reason(operation_id))
+
+    @staticmethod
+    def _unknown_tool_hint(fn_name: str, fn_map: dict) -> str:
+        """Observacao de recuperacao quando o LLM erra o NOME da ferramenta.
+
+        Sugere os nomes do mesmo dominio (prefixo antes do '_') disponiveis neste
+        turno, para o LLM corrigir sem re-retrieval. Mensagem destinada ao LLM
+        (observacao), nao ao operador.
+        """
+        prefix = fn_name.split("_", 1)[0]
+        same_domain = sorted(
+            name for name, e in fn_map.items()
+            if not e.get("local") and name.split("_", 1)[0] == prefix and name != fn_name
+        )
+        if same_domain:
+            return (
+                f"A ferramenta '{fn_name}' nao existe. Disponiveis neste dominio: "
+                f"{', '.join(same_domain)}. Use um destes nomes exatos — a capacidade "
+                f"provavelmente existe, voce so errou o nome."
+            )
+        disponiveis = sorted(n for n, e in fn_map.items() if not e.get("local"))
         return (
-            f"Vou executar: {operation_id} ({method} {rel_path}).\n"
-            f"Parametros: {arg_str}.\n"
-            f"Motivo da confirmacao: {reason}."
+            f"A ferramenta '{fn_name}' nao existe. Ferramentas deste turno: "
+            f"{', '.join(disponiveis)}. Use um destes nomes exatos."
         )
 
     @staticmethod

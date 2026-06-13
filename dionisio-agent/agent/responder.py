@@ -39,12 +39,12 @@ async def synthesize(state: ConversationState, llm=None, messages: list[dict] | 
 
 
 def partial_failure(state: ConversationState) -> str:
-    """Mensagem honesta de falha parcial ao estourar o limite de iteracoes."""
-    tried = ", ".join(
-        f"{a.operation_id} ({'ok' if a.ok else 'falhou'})" for a in state.actions_taken
-    )
-    detail = f" Tentei: {tried}." if tried else ""
+    """Mensagem honesta de falha parcial ao estourar o limite de iteracoes.
+
+    Em linguagem de operador (Dia 6): nao lista operationIds — o detalhe tecnico
+    (quais operacoes foram tentadas) fica no log, via `state.actions_taken`.
+    """
     return (
-        "Nao consegui concluir o pedido dentro do limite de passos."
-        f"{detail} Pode reformular ou detalhar melhor o que precisa?"
+        "Nao consegui concluir esse pedido — ele tem muitos passos e travei no meio. "
+        "Pode detalhar um pouco mais ou quebrar em partes menores?"
     )
