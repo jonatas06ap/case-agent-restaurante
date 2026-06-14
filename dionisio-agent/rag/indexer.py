@@ -46,6 +46,12 @@ _OPERATION_HINTS = {
         "Pedidos feitos pelos clientes; quem pediu um prato/item num periodo recente.",
     "analytics.topItems":
         "Pratos/itens mais pedidos do cardapio; ranking de itens vendidos.",
+    "orders.stats":
+        "Ticket medio e valor medio por pedido; total/contagem de pedidos; "
+        "faturamento por pedido; estatisticas resumidas dos pedidos.",
+    "promotions.update":
+        "Mudar o horario, as condicoes ou os dados de uma promocao que ja existe; "
+        "editar/ajustar uma promocao.",
 }
 _RAG_DIR = Path(__file__).resolve().parent
 _SPEC_PATH = _RAG_DIR / "openapi_spec.json"

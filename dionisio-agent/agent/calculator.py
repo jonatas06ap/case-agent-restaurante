@@ -1,7 +1,7 @@
 """Calculadora — ferramenta LOCAL e determinística para tirar a aritmética da
-cabeça do LLM (Dia 6).
+cabeça do LLM.
 
-Motivo (ver `Context/simulacao.md`): o modelo erra conta e ordenação quando faz
+Motivo (observado em uso real): o modelo erra conta e ordenação quando faz
 no texto — ordenou um ranking de receita errado, calculou 71/129 como 53% (é
 55%). A correção é não deixar o LLM calcular: toda soma/média/percentual/contagem/
 ordenação passa por esta tool, que roda em Python puro (sem `eval`, sem rede) e

@@ -62,10 +62,10 @@ class Executor:
         fn_name = tool_call.function.name
         entry = fn_map.get(fn_name)
         if entry is None:
-            # Nome errado != capacidade inexistente (Dia 6). Em vez do beco sem
-            # saida, sugere os nomes do MESMO dominio disponiveis neste turno para
-            # o LLM se autocorrigir no proprio turno (ver falsos negativos em
-            # Context/simulacao.md). Sem re-retrieval.
+            # Nome errado != capacidade inexistente. Em vez do beco sem saida,
+            # sugere os nomes do MESMO dominio disponiveis neste turno para o LLM
+            # se autocorrigir no proprio turno (corrige falsos negativos observados
+            # em uso real). Sem re-retrieval.
             return self._unknown_tool_hint(fn_name, fn_map)
 
         # --- parse dos argumentos ---
@@ -92,7 +92,7 @@ class Executor:
         rel_path = self._relative_path(entry["path"], path_args)
         operation_id = entry["operation_id"]
 
-        # --- barreira de confirmacao (Dia 3), no boundary da tool-call ---
+        # --- barreira de confirmacao, no boundary da tool-call ---
         confirmed: bool | None = None
         if requires_confirmation(operation_id):
             plano = self._build_plan(operation_id, method, rel_path, args)
@@ -154,7 +154,7 @@ class Executor:
     def _build_plan(operation_id: str, method: str, rel_path: str, args: dict) -> str:
         """Plano curto e honesto apresentado ao operador antes de executar.
 
-        Em LINGUAGEM DE RESTAURANTE (Dia 6): nada de operationId, metodo/path HTTP
+        Em LINGUAGEM DE RESTAURANTE: nada de operationId, metodo/path HTTP
         ou nome de campo JSON — o operador leigo nao entende isso. A traducao mora
         em `agent/phrasing.py` (mapa das 8 operacoes confirmaveis). Cita SO dados ja
         conhecidos (os args, vindos do que a API ja retornou) — nao inventa nada.

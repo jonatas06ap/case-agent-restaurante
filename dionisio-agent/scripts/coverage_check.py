@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Dia 7 — Varredura de cobertura (reachability das 61 operacoes).
+"""Varredura de cobertura (reachability das 61 operacoes).
 
-DIAGNOSTICO, NAO CONSERTO. Mede, operacao a operacao, se cada uma das 61 funcoes da
-API e alcancavel pelo agente a partir de um pedido em linguagem natural de um unico
-turno, e classifica cada resultado em:
+Mede, operacao a operacao, se cada uma das 61 funcoes da API e alcancavel pelo agente
+a partir de um pedido em linguagem natural de um unico turno, e classifica cada
+resultado em:
 
   ✅ alcancada   — a operationId esperada apareceu em state.actions_taken (resposta
                    benigna da escrita interceptada OU confirmacao negada — ambos contam:
@@ -61,14 +61,15 @@ from client import DionisioClient  # noqa: E402
 from rag import Retriever  # noqa: E402
 
 console = Console()
-REPORT_PATH = Path(__file__).resolve().parents[2] / "History" / "dia_7.md"
+# Relatorio auto-gerado, escrito dentro do projeto (artefato regeneravel).
+REPORT_PATH = Path(__file__).resolve().parents[1] / "coverage_report.md"
 
 # Payload benigno devolvido por toda escrita interceptada — nunca vai a rede.
 BENIGN_WRITE_RESULT = {"id": "test", "status": "ok", "items": []}
 
 
 # ---------------------------------------------------------------------------
-# A matriz das 61 operacoes (transcrita de Context/daily_prompts/prompt_day_7.md).
+# A matriz das 61 operacoes (uma entrada por operationId da API).
 # Cada item: (operationId esperada, pedido em PT). Ids literais viram "o primeiro
 # da lista / o que mais gastou" para o agente descobrir sozinho via GET real.
 # ---------------------------------------------------------------------------
@@ -286,7 +287,7 @@ async def retrieval_reach(retriever: Retriever, expected: str, prompt: str) -> d
 
     Reproduz exatamente o que o agente monta por turno (core.py): retrieval ancorado no
     texto do turno (`exclude_destructive=False`, k_operations=8) + `planner.build_tools`
-    (que aplica a expansao de dominio do Dia 6). A op e ALCANCAVEL no turno sse seu
+    (que aplica a expansao de dominio). A op e ALCANCAVEL no turno sse seu
     fn_name (op_id com '.'->'_') esta no fn_map resultante. Distingue se veio do top-k
     do retrieval ou so da expansao de dominio. So embeddings locais — custo ~zero.
     """
@@ -306,6 +307,49 @@ async def retrieval_reach(retriever: Retriever, expected: str, prompt: str) -> d
         "expected": expected, "prompt": prompt,
         "status": "✅" if available else "❌",
         "source": source, "topk": topk,
+    }
+
+
+# Textos do cenario cross-turn (reproduz o log dos cupons), reusados pela Camada A e
+# pela parte ao vivo.
+XT_T1 = "cria uma campanha de reativação para clientes inativos há 60 dias, com um cupom de 15%"
+XT_T2 = "faça os passos exceto o contato"
+
+
+async def cross_turn_reach_deterministic(retriever: Retriever) -> dict:
+    """Camada A CROSS-TURN (deterministica, sem LLM/API): a prova gratis da persistencia.
+
+    Encadeia turno 1 -> turno 2 pelo MESMO `ConversationState`, acumulando `task_domains`
+    exatamente como `core.run_turn` (via `planner.task_domains_of`), e verifica se
+    `coupons.assignGroup` entra no `fn_map` do turno 2. Sem estado, a checagem do turno 2 e
+    single-turn e da ❌; com a persistencia de dominio da tarefa a expansao de irmas traz o
+    dominio `coupons` mesmo o texto do turno 2 nao o mencionando. So embeddings locais +
+    spec — custo ~zero.
+    """
+    state = ConversationState()
+
+    # turno 1: para MEDIR a alcancabilidade nao e preciso o LLM — basta acumular os
+    # dominios que o retrieval do turno 1 tocou (e o que core faz antes de montar tools).
+    r1 = await retriever.retrieve(XT_T1, k_operations=8, k_docs=3, exclude_destructive=False)
+    state.note_domains(planner.task_domains_of(r1.operations))
+
+    # turno 2: monta as tools como core — agora com os dominios PERSISTIDOS da tarefa.
+    r2 = await retriever.retrieve(XT_T2, k_operations=8, k_docs=3, exclude_destructive=False)
+    state.note_domains(planner.task_domains_of(r2.operations))
+    _, fn_map = planner.build_tools(r2, task_domains=state.task_domains)
+
+    t2_topk = [op.operation_id for op in r2.operations]
+    reached = "coupons_assignGroup" in fn_map
+    if not reached:
+        source = "—"
+    elif "coupons.assignGroup" in set(t2_topk):
+        source = "top-k"
+    else:
+        source = "expansão (domínio persistido)"
+    return {
+        "t1": XT_T1, "t2": XT_T2,
+        "task_domains": list(state.task_domains),
+        "reached": reached, "source": source, "t2_topk": t2_topk,
     }
 
 
@@ -329,11 +373,10 @@ def build_markdown(results: dict[str, list[dict]], controls: list[dict],
     reached = counts["✅"]
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     L: list[str] = []
-    L.append("# Dia 7 — Varredura de cobertura (reachability das 61 operações)\n")
+    L.append("# Varredura de cobertura (reachability das 61 operações)\n")
     L.append(f"> Gerado por `scripts/coverage_check.py` (live, LLM + Retriever reais) em {now}.\n")
-    L.append("**Diagnóstico, não conserto.** Mede, operação a operação, se cada uma das 61 "
-             "funções da API é alcançável a partir de um pedido em linguagem natural de um único "
-             "turno. Nenhum código de runtime foi tocado — só se adicionou o script.\n")
+    L.append("Mede, operação a operação, se cada uma das 61 funções da API é alcançável a "
+             "partir de um pedido em linguagem natural de um único turno.\n")
     if counts["💥"]:
         L.append(f"> ⚠️ **RUN PARCIAL / INVÁLIDO:** {counts['💥']} operações falharam por erro de "
                  "infraestrutura (status 💥 — ex: HTTP 402, créditos do OpenRouter esgotados), "
@@ -413,7 +456,7 @@ async def run_full_live(retriever: Retriever, llm: LLM) -> int:
         agent = Agent(llm=llm, retriever=retriever, client=rec)
 
         total = sum(len(v) for v in DOMAINS.values())
-        console.rule(f"[bold]Dia 7 — varredura de {total} operações (FULL LIVE)")
+        console.rule(f"[bold]Varredura de {total} operações (FULL LIVE)")
 
         results: dict[str, list[dict]] = {}
         for domain, ops in DOMAINS.items():
@@ -489,22 +532,22 @@ def print_retrieval_matrix(results: dict[str, list[dict]]) -> None:
         console.print(table)
 
 
-def build_markdown_hybrid(results, counts, total, cross, t2_reach,
+def build_markdown_hybrid(results, counts, total, cross, t2_reach, xt,
                           controls_reach, writes) -> str:
     avail = counts["✅"]
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     L: list[str] = []
-    L.append("# Dia 7 — Varredura de cobertura (reachability das 61 operações)\n")
+    L.append("# Varredura de cobertura (reachability das 61 operações)\n")
     L.append(f"> Gerado por `scripts/coverage_check.py` (modo **híbrido**) em {now}.\n")
-    L.append("**Diagnóstico, não conserto.** Mede a alcançabilidade **estrutural** de cada uma das "
-             "61 operações: a partir de um pedido em linguagem natural de um único turno, o "
-             "retrieval-por-turno coloca a operação esperada na lista de ferramentas daquele "
-             "turno? Nenhum código de runtime foi tocado — só se adicionou o script.\n")
+    L.append("Mede a alcançabilidade **estrutural** de cada uma das 61 operações: a partir de "
+             "um pedido em linguagem natural de um único turno, o retrieval-por-turno coloca a "
+             "operação esperada na lista de ferramentas daquele turno? Inclui as dicas curadas "
+             "(`orders.stats`/`promotions.update`) e a persistência de domínio cross-turn.\n")
     L.append("## Método\n")
     L.append("- **Camada A (determinística, sem LLM/API, custo ~zero):** para cada pedido, roda o "
              "`Retriever` real (`k_operations=8`, `exclude_destructive=False`) + "
              "`planner.build_tools` — exatamente o que `agent/core.py` monta por turno, incluindo a "
-             "expansão de domínio do Dia 6. A operação é **alcançável** sse seu `fn_name` entra no "
+             "expansão de domínio. A operação é **alcançável** sse seu `fn_name` entra no "
              "`fn_map` resultante. Distingue se veio do **top-k** do retrieval ou só da **expansão "
              "de domínio**.")
     L.append("- **Cross-turn AO VIVO (Sonnet real):** o cenário do log roda de ponta a ponta no LLM "
@@ -554,15 +597,21 @@ def build_markdown_hybrid(results, counts, total, cross, t2_reach,
         L.append(f"  - ops no turno 2: {cross['t2_ops'] or '—'}")
         verdict = "✅ SIM" if cross["assign_reached_t2"] else "❌ NÃO"
         L.append(f"- **`coupons.assignGroup` alcançada no turno 2 (ao vivo)?** {verdict}")
-    L.append(f"- **Camada A no texto do turno 2** (\"{cross['t2']}\"): `coupons.assignGroup` entra na "
-             f"lista de tools daquele turno? **{t2_reach['status']}** ({t2_reach['source']}). "
-             f"Retrieval trouxe: {', '.join(t2_reach['topk'][:6])}.")
+    L.append(f"- **Camada A SINGLE-turn no texto do turno 2** (\"{cross['t2']}\", sem estado): "
+             f"`coupons.assignGroup` entra na lista de tools? **{t2_reach['status']}** "
+             f"({t2_reach['source']}). Retrieval trouxe: {', '.join(t2_reach['topk'][:6])}.")
     if t2_reach["status"] == "❌":
-        L.append("  - Confirma a hipótese: o turno de continuação (\"faça os passos...\") não menciona "
-                 "o domínio `coupons`; o retrieval daquele turno não o traz e a expansão de domínio "
-                 "(teto de 15, Dia 6) se esgota nos domínios recuperados antes de chegar a `coupons` — "
-                 "então `coupons.assignGroup` fica **inalcançável**. A alcançabilidade depende da "
-                 "redação do turno atual.")
+        L.append("  - Sem estado, a continuação (\"faça os passos...\") não menciona o domínio "
+                 "`coupons`; o retrieval daquele turno não o traz e a expansão de domínio se esgota "
+                 "nos domínios recuperados antes de chegar a `coupons`.")
+    xt_verdict = "✅ SIM" if xt["reached"] else "❌ NÃO"
+    L.append(f"- **Camada A CROSS-turn (com estado persistido):** encadeando turno 1 → turno 2 "
+             f"pelo mesmo `ConversationState` (domínios acumulados: {', '.join(xt['task_domains'])}), "
+             f"`coupons.assignGroup` alcançável no turno 2? **{xt_verdict}** (via {xt['source']}).")
+    if xt["reached"]:
+        L.append("  - A persistência de domínio traz as irmãs do domínio `coupons` que a **tarefa** "
+                 "tocou no turno 1 — mesmo o texto do turno 2 não mencionando cupom. Prova "
+                 "determinística, sem gastar token. Antes ❌ (single-turn) → depois ✅ (cross-turn).")
     L.append("")
 
     L.append("## Controles — capacidades inexistentes (Camada A)\n")
@@ -584,17 +633,23 @@ def build_markdown_hybrid(results, counts, total, cross, t2_reach,
         sample = ", ".join(f"`{m} {p}`" for m, p in writes[:12])
         L.append(f"- Amostra das interceptadas: {sample}{' …' if len(writes) > 12 else ''}")
     L.append("")
-    L.append("## Próximo dia (conserto, fora do escopo do Dia 7)\n")
-    L.append("As lacunas ❌ acima são a base factual para, num dia seguinte, fechar a cobertura "
-             "por turno (ex: re-retrieval guiado por sub-objetivo, persistir o domínio da tarefa "
-             "entre turnos, ou retrieval sobre o histórico além do último turno).\n")
+    L.append("## Como a cobertura é garantida\n")
+    L.append("- **Turno único:** dicas curadas em `_OPERATION_HINTS` (`rag/indexer.py`) para "
+             "`orders.stats` (ticket médio / total de pedidos) e `promotions.update` (mudar "
+             "horário/condições de uma promoção) — ambas entram na lista de tools do próprio pedido.")
+    L.append("- **Cross-turn:** persistência de domínio no `ConversationState` (`task_domains`) "
+             "expandida com prioridade em `planner._expand_domain_siblings` — a continuação mantém "
+             "os domínios que a tarefa já tocou, sem reancorar o retrieval no histórico inteiro.")
+    L.append("- **Ambiguidade `orders.stats` × `analytics.orders`:** ambas ficam disponíveis (são "
+             "respostas legítimas a recortes diferentes de \"métricas de pedidos\"); a dica só "
+             "garante que `orders.stats` também apareça, sem derrubar `analytics.orders`.\n")
     return "\n".join(L)
 
 
 async def run_hybrid(retriever: Retriever, llm: LLM) -> int:
     """Default: Camada A determinística das 61 (gratis) + cross-turn ao vivo."""
     total = sum(len(v) for v in DOMAINS.values())
-    console.rule(f"[bold]Dia 7 — alcançabilidade de retrieval ({total} ops, Camada A grátis)")
+    console.rule(f"[bold]Alcançabilidade de retrieval ({total} ops, Camada A grátis)")
 
     results: dict[str, list[dict]] = {}
     for domain, ops in DOMAINS.items():
@@ -630,8 +685,11 @@ async def run_hybrid(retriever: Retriever, llm: LLM) -> int:
             agent = Agent(llm=llm, retriever=retriever, client=rec)
             cross = await run_cross_turn(agent)
             writes = rec.writes_intercepted
-    # Camada A no texto do turno 2 (deterministico, gratis — roda mesmo sem LLM)
+    # Camada A no texto do turno 2 (deterministico, gratis — roda mesmo sem LLM).
+    # SINGLE-turn (sem estado): a continuacao sozinha nao alcanca assignGroup (❌, "antes").
     t2_reach = await retrieval_reach(retriever, "coupons.assignGroup", cross["t2"])
+    # CROSS-turn (com estado persistido): a prova da persistencia de dominio (✅, "depois").
+    xt = await cross_turn_reach_deterministic(retriever)
 
     # ----- render -----
     console.rule("[bold]Matriz de alcançabilidade de retrieval (Camada A)")
@@ -659,19 +717,24 @@ async def run_hybrid(retriever: Retriever, llm: LLM) -> int:
         verdict = "[red]NÃO[/red]" if not cross["assign_reached_t2"] else "[green]SIM[/green]"
         console.print(f"\n[bold]Cross-turn (ao vivo):[/bold] coupons.assignGroup alcançada no turno 2? {verdict}")
         console.print(f"  ops no turno 2: {cross['t2_ops'] or '—'}")
-    console.print(f"  [dim]Camada A no texto do turno 2: assignGroup {t2_reach['status']} "
-                  f"({t2_reach['source']})[/dim]")
+    console.print(f"  [dim]Camada A single-turn no texto do turno 2 (sem estado): assignGroup "
+                  f"{t2_reach['status']} ({t2_reach['source']}) — a continuação sozinha não basta.[/dim]")
+    xt_verdict = "[green]✅ SIM[/green]" if xt["reached"] else "[red]❌ NÃO[/red]"
+    console.print(f"\n[bold]Cross-turn determinístico (com estado persistido):[/bold] "
+                  f"coupons.assignGroup alcançável no turno 2? {xt_verdict} (via {xt['source']})")
+    console.print(f"  [dim]domínios persistidos da tarefa: {', '.join(xt['task_domains'])}[/dim]")
     console.print(f"\n[bold]Integridade:[/bold] {len(writes)} escritas interceptadas no cross-turn "
                   "(sem rede); confirmação negada; Camada A não toca LLM/API.")
 
-    md = build_markdown_hybrid(results, counts, total, cross, t2_reach, controls_reach, writes)
+    md = build_markdown_hybrid(results, counts, total, cross, t2_reach, xt,
+                               controls_reach, writes)
     REPORT_PATH.write_text(md, encoding="utf-8")
     console.print(f"\n[green]Relatório salvo em[/green] {REPORT_PATH}")
     return 0
 
 
 async def main() -> int:
-    parser = argparse.ArgumentParser(description="Dia 7 — varredura de cobertura das 61 operações.")
+    parser = argparse.ArgumentParser(description="Varredura de cobertura das 61 operações.")
     parser.add_argument("--full-live", action="store_true",
                         help="varredura COMPLETA ao vivo das 61 ops (cara — exige créditos). "
                              "Default: modo híbrido (Camada A grátis + cross-turn ao vivo).")

@@ -2,9 +2,9 @@
 
 O loop ReAct (core.py) sai quando o LLM responde texto puro (sem tool_calls): esse texto
 JA e a resposta final, sintetizada pelo proprio modelo com grounding (o system prompt
-instrui a citar os dados reais). Aqui apenas extraimos esse texto — "formatacao direta",
-conforme o prompt do Dia 2 permite. Se, por algum motivo, o ultimo turno do LLM nao trouxe
-texto, fazemos uma ultima chamada de sintese explicita como fallback.
+instrui a citar os dados reais). Aqui apenas extraimos esse texto — "formatacao direta".
+Se, por algum motivo, o ultimo turno do LLM nao trouxe texto, fazemos uma ultima chamada
+de sintese explicita como fallback.
 
 `partial_failure` produz uma mensagem honesta quando o loop estoura o limite de iteracoes.
 """
@@ -41,7 +41,7 @@ async def synthesize(state: ConversationState, llm=None, messages: list[dict] | 
 def partial_failure(state: ConversationState) -> str:
     """Mensagem honesta de falha parcial ao estourar o limite de iteracoes.
 
-    Em linguagem de operador (Dia 6): nao lista operationIds — o detalhe tecnico
+    Em linguagem de operador: nao lista operationIds — o detalhe tecnico
     (quais operacoes foram tentadas) fica no log, via `state.actions_taken`.
     """
     return (

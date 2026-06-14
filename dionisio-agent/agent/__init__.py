@@ -1,4 +1,4 @@
-"""Agente assistente do Dionisio — loop ReAct single-agent (Dia 2).
+"""Agente assistente do Dionisio — loop ReAct single-agent.
 
 Componentes:
 - state.py     ConversationState (historico, entidades, acoes)

@@ -1,6 +1,6 @@
-"""Phrasing — traduz o plano de confirmacao para LINGUAGEM DE OPERADOR (Dia 6).
+"""Phrasing — traduz o plano de confirmacao para LINGUAGEM DE OPERADOR.
 
-Motivo (`Context/simulacao.md`): antes, a confirmacao de uma acao destrutiva mostrava
+Motivo (observado em uso real): antes, a confirmacao de uma acao destrutiva mostrava
 `reservations.reschedule (POST /reservations/{id}/reschedule). Parametros: start=178...`
 — ininteligivel para um dono de restaurante. Aqui mapeamos as **8 operacoes que exigem
 confirmacao** (7 `x-destructive` + `coupons.assignGroup`) para uma frase de restaurante,

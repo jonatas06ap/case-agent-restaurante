@@ -1,7 +1,7 @@
 """Core — o loop ReAct (reason -> act -> observe -> repeat).
 
 Um turno:
-1. Retrieval (exclude_destructive=True no Dia 2 — destrutividade e do Dia 3).
+1. Retrieval (inclui destrutivas: a barreira de confirmacao fica no executor).
 2. Monta tools a partir do retrieval (uma vez por turno).
 3. Loop (max 8 iteracoes): chama o LLM; se ha tool_calls, executa e devolve observacoes
    como mensagens role:tool; senao, o texto do LLM e a resposta -> sai do loop.
@@ -84,7 +84,7 @@ class Agent:
         state.iterations = 0
         state.messages.append({"role": "user", "content": user_input})
 
-        # --- pre-check de ambiguidade (Dia 3), antes do retrieval/loop ---
+        # --- pre-check de ambiguidade, antes do retrieval/loop ---
         # Perguntar antes de agir: se o pedido ja nasce ambiguo, devolve UMA
         # pergunta e encerra o turno sem tocar a API.
         verdict = await detect_ambiguity(user_input, state, self.llm)
@@ -101,7 +101,14 @@ class Agent:
             user_input, k_operations=8, k_docs=3, exclude_destructive=False
         )
         self._emit("retrieve", {"operations": retrieval.operations, "docs": retrieval.docs})
-        tools, fn_map = planner.build_tools(retrieval)
+
+        # Lacuna cross-turn: acumula os dominios tocados por ESTE turno no
+        # estado da tarefa e monta as tools expandindo tambem as irmas dos dominios
+        # PERSISTIDOS — assim uma continuacao ("faca os passos exceto o contato") cujo
+        # texto nao menciona o dominio que a tarefa ainda precisa (ex: `coupons`) mantem
+        # `coupons.assignGroup` na lista de tools. Em memoria, a partir do spec local.
+        state.note_domains(planner.task_domains_of(retrieval.operations))
+        tools, fn_map = planner.build_tools(retrieval, task_domains=state.task_domains)
 
         messages: list[dict] = []
         for i in range(MAX_ITERATIONS):
