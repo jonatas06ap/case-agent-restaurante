@@ -76,7 +76,7 @@ de fingir. Nunca afirma que enviou uma mensagem, removeu um prato ou executou al
 ## Testes
 
 ```bash
-uv run pytest            # suíte offline: 9 testes, LLM + API mockados (determinístico)
+uv run pytest            # suíte offline: 50 testes, LLM + API mockados (determinístico)
 uv run pytest -m live    # variantes ao vivo: LLM + API reais (lê o .env)
 ```
 
@@ -110,7 +110,7 @@ scripts/         build_index · smoke_test · agent_cli · safety_check · tasks
 tests/           test_tasks.py (6 tarefas) + conftest (dublês) + fixtures/
 ```
 
-Um turno: **ambiguidade?** (pré-loop, 1 LLM) → **retrieval** (top-5 operações + top-3 docs,
+Um turno: **ambiguidade?** (pré-loop, 1 LLM) → **retrieval** (top-8 operações + top-3 docs,
 inclui destrutivas) → **loop ReAct** (LLM escolhe tool tipada → executor chama a API →
 observação volta → repete) → **confirmação** no boundary de toda op destrutiva/de massa →
 **resposta** citando o dado real. `DionisioAPIError` nunca é silenciado: vira observação e o

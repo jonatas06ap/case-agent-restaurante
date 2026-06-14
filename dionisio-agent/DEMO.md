@@ -106,6 +106,6 @@ chamado), a Tarefa 3 (lista real) e a Tarefa 5 (duas recusas honestas + lista en
 ## Opção C — suíte de testes (offline, determinística)
 
 ```bash
-uv run pytest            # 9/9, mocks — prova o comportamento das 6 tarefas sem rede
+uv run pytest            # 50/50, mocks — prova o comportamento das 6 tarefas sem rede
 uv run pytest -m live    # variantes com LLM + API reais
 ```
