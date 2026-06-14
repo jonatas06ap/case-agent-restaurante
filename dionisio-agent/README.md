@@ -36,25 +36,27 @@ uv run python scripts/agent_cli.py        # 4. abre o CLI interativo do agente
 O `.env.example` já vem com `DIONISIO_API_KEY`, a base URL e o modelo preenchidos — basta
 colar sua `OPENROUTER_API_KEY`.
 
-## Como usar — as 6 tarefas do case
+## Como usar
 
 Rode `uv run python scripts/agent_cli.py` e digite o pedido. O CLI mostra, em cinza, o
 retrieval e cada tool call; em negrito, a resposta ao operador. A sessão mantém contexto
 multi-turno (dá pra dizer "cancela a reserva **dele**" depois de falar do João).
 
-| # | Pedido (digite no `>`) | O que esperar |
-|---|---|---|
-| **1** | `quantas reservas temos pra hoje?` | Conta as reservas do dia e cita o número real ("Temos 1 reserva para hoje…"). |
-| **2** | `remarca a reserva do João de quinta pra sábado no mesmo horário e avisa ela` | Multi-step (acha o cliente → a reserva → confere mesa no sábado) → **pede confirmação** antes de remarcar; **recusa** "avisar" (a API não tem canal de notificação). |
-| **3** | `lista os clientes que gastaram mais de R$500 no último mês e nunca usaram cupom` | Filtro composto: cruza gasto × uso de cupom e devolve a lista real (nome, telefone, gasto). |
-| **4** | `cria uma campanha de reativação pra inativos há 60 dias com cupom de 15%` | Descobre os inativos → cria o cupom → **na hora de atribuir ao grupo, apresenta o plano e exige "confirmar"**. Um "ok"/"não" aborta sem chamar a API. |
-| **5** | `o prato 'Risoto de Funghi' saiu do cardápio — remove ele e avisa quem pediu ele nos últimos 7 dias` | Separa o possível do impossível: **recusa** remover (sem domínio de cardápio na API) e **recusa** avisar, mas **entrega a lista** de quem pediu o prato no período (busca o histórico de pedidos e filtra pelo item). |
-| **6** | `cancela o pedido do João` (com 2+ pedidos) | **Ambíguo** → faz **uma** pergunta de desambiguação e **não** toca a API antes de saber qual pedido. Variante impossível: `manda um SMS pro João` → recusa explicada (sem canal de comunicação). |
+Exemplos de pedidos:
 
-### Os dois comportamentos que o avaliador procura
+| Pedido (digite no `>`) | Comportamento |
+|---|---|
+| `quantas reservas temos pra hoje?` | Conta as reservas do dia e cita o número real. |
+| `remarca a reserva do João de quinta pra sábado no mesmo horário` | Multi-step (busca cliente → reserva → disponibilidade) → **pede confirmação** antes de remarcar. |
+| `lista os clientes que gastaram mais de R$500 no último mês e nunca usaram cupom` | Filtro composto: cruza gasto × uso de cupom e devolve a lista real (nome, telefone, gasto). |
+| `cria uma campanha de reativação pra inativos há 60 dias com cupom de 15%` | Descobre os inativos → cria o cupom → **exige "confirmar"** antes de atribuir ao grupo. |
+| `o prato 'Risoto de Funghi' saiu do cardápio — remove ele e avisa quem pediu ele nos últimos 7 dias` | Separa o possível do impossível: entrega a lista de pedidos do período, recusa as ações sem suporte na API. |
+| `cancela o pedido do João` (com 2+ pedidos ativos) | **Ambíguo** → faz uma pergunta de desambiguação sem tocar a API. |
 
-**Confirmação de dois estágios** (Tarefas 2 e 4) — antes de uma ação com efeito real, o agente
-imprime o plano e bloqueia até o operador digitar `confirmar`:
+### Confirmação de dois estágios
+
+Antes de qualquer ação com efeito real, o agente imprime o plano e bloqueia até o operador
+digitar `confirmar`:
 
 ```
 > cria uma campanha de reativação pra inativos há 60 dias com cupom de 15%
@@ -70,8 +72,8 @@ imprime o plano e bloqueia até o operador digitar `confirmar`:
 
 Só `confirmar`/`confirmo`/`sim, confirmo` prosseguem — "ok"/"sim"/"pode ser" **abortam**.
 
-**Recusa honesta** (Tarefas 5 e 6) — quando a API não cobre o pedido, o agente diz isso em vez
-de fingir. Nunca afirma que enviou uma mensagem, removeu um prato ou executou algo que falhou.
+**Recusa honesta** — quando a API não cobre o pedido, o agente diz isso em vez de fingir.
+Nunca afirma que enviou uma mensagem, removeu um prato ou executou algo que a API não suporta.
 
 ## Testes
 
