@@ -1,7 +1,7 @@
 """Planner — system prompt, montagem das tools a partir do retrieval e das messages.
 
-Decisao-chave (ver History/dia_1.md §3.5): o texto EMBEDADO de cada operacao e so uma
-frase curta de intencao. Os parametros/body para montar uma chamada valida NAO vem do
+Decisao-chave: o texto EMBEDADO de cada operacao e so uma frase curta de intencao
+(uma "Use when"). Os parametros/body para montar uma chamada valida NAO vem do
 `full_text`; vem do OpenAPI spec local. Aqui carregamos o spec uma vez e, por operationId,
 montamos um JSON Schema tipado (query + path params + campos de body).
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -24,8 +25,16 @@ from . import calculator
 
 logger = logging.getLogger("dionisio.agent.planner")
 
-# Expansao de dominio (Dia 6): teto de operacoes-irmas injetadas alem do top-k.
-_DOMAIN_EXPANSION_CAP = 15
+# Expansao de dominio: teto de operacoes-irmas injetadas alem do top-k. Em 18 para caber
+# os 2-3 dominios CENTRAIS da tarefa (persistidos) na frente da fila sem cortar a irma
+# especifica que a continuacao precisa (ex: coupons.assignGroup atras de clients). Ainda
+# enxuto perto das 61 ops da API.
+_DOMAIN_EXPANSION_CAP = 18
+
+# Quantas operacoes-topo do retrieval definem os dominios CENTRAIS da tarefa.
+# So o topo do ranking entra na persistencia cross-turn: o long-tail do top-k (scores
+# baixos) e ruido e, se persistido, inflaria a lista de tools dos turnos seguintes.
+_TASK_DOMAIN_PERSIST_K = 3
 
 _SPEC_PATH = Path(__file__).resolve().parent.parent / "rag" / "openapi_spec.json"
 _HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
@@ -189,11 +198,47 @@ def _schema_property(spec: dict, schema: dict) -> dict:
     return prop
 
 
+# Tokens {name} no template do path.
+_PATH_PARAM_RE = re.compile(r"\{([^}]+)\}")
+
+_WRITE_METHODS = {"POST", "PUT", "PATCH"}
+
+# Corpo curado para operacoes de escrita que o spec do case-mock NAO declara em
+# `requestBody` — os campos vivem so no texto do `summary` (ex: "Cria cupom (name,
+# type, benefitText).") e a API valida os obrigatorios (400 "Campo obrigatorio: name").
+# Sem isso a tool chega ao LLM sem slots de argumento e ele chama vazia. Fonte: o
+# proprio `summary`/doc da operacao. Cada campo: (nome, tipo_json, obrigatorio?).
+_CURATED_BODY: dict[str, list[tuple[str, str, bool]]] = {
+    "coupons.create": [
+        ("name", "string", True), ("type", "string", False), ("benefitText", "string", False),
+    ],
+    "coupons.assignGroup": [("groupId", "string", True)],
+    "orders.create": [
+        ("items", "array", True), ("type", "string", False),
+        ("clientId", "string", False), ("paymentMethod", "string", False),
+    ],
+    "orders.updateStatus": [("status", "string", True)],
+    "promotions.create": [
+        ("name", "string", True), ("discountType", "string", True),
+        ("discountValue", "number", True),
+        ("validFrom", "integer", False), ("validUntil", "integer", False),
+    ],
+    "store.updateHours": [("workingHours", "object", True)],
+}
+
+
 def _build_parameters_schema(op_id: str) -> tuple[dict, dict]:
     """Retorna (json_schema, locations).
 
     json_schema: {"type":"object","properties":{...},"required":[...]} para a tool.
     locations: {param_name: "path"|"query"|"body"} para o executor rotear os args.
+
+    Robustez ao spec minimalista do case-mock (varias operacoes de escrita nao declaram
+    `parameters` nem `requestBody`): (a) path params sao extraidos do TEMPLATE do path
+    (`{id}`) quando nao declarados; (b) campos de body curados (`_CURATED_BODY`) dao slots
+    explicitos ao LLM; (c) operacoes de escrita sem body estruturado ganham
+    `additionalProperties: true`, deixando o LLM preencher o corpo guiado pela descricao
+    (o executor roteia args desconhecidos para o body).
     """
     spec = _load_spec()
     entry = _operations_by_id().get(op_id)
@@ -235,17 +280,79 @@ def _build_parameters_schema(op_id: str) -> tuple[dict, dict]:
         locations[field] = "body"
         if field in body_required:
             required.append(field)
+    spec_declared_body = bool(body_props)
+
+    method = entry["method"].upper()
+
+    # --- (a) path params do TEMPLATE nao declarados em `parameters` ---
+    for name in _PATH_PARAM_RE.findall(entry["path"]):
+        if name in properties:
+            continue
+        properties[name] = {"type": "string", "description": f"Identificador para {{{name}}} no caminho."}
+        locations[name] = "path"
+        required.append(name)
+
+    # --- (b) corpo curado quando o spec nao declara requestBody ---
+    if not spec_declared_body:
+        for field, ftype, is_required in _CURATED_BODY.get(op_id, []):
+            if field in properties:
+                continue
+            properties[field] = {"type": ftype}
+            locations[field] = "body"
+            if is_required:
+                required.append(field)
 
     json_schema: dict = {"type": "object", "properties": properties}
     if required:
         json_schema["required"] = required
+    # --- (c) escrita sem body estruturado: deixa o LLM preencher o corpo a partir da
+    # descricao (o executor roteia args nao mapeados para o body). ---
+    if method in _WRITE_METHODS and not spec_declared_body:
+        json_schema["additionalProperties"] = True
     return json_schema, locations
 
 
-def _expand_domain_siblings(operations: list[OperationDoc]) -> list[OperationDoc]:
-    """Injeta operacoes-irmas dos dominios tocados, fora do top-k (Dia 6).
+def domains_of(operations: list[OperationDoc]) -> list[str]:
+    """Dominios distintos das operacoes, na ordem em que aparecem (relevancia)."""
+    out: list[str] = []
+    for op in operations:
+        d = op.operation_id.split(".")[0]
+        if d not in out:
+            out.append(d)
+    return out
 
-    Falso negativo medido (`Context/simulacao.md`): o retrieval roda UMA vez por
+
+def task_domains_of(operations: list[OperationDoc]) -> list[str]:
+    """Dominios CENTRAIS da tarefa = dominios das top-K operacoes do retrieval.
+
+    So o topo do ranking — abaixo dele o top-k vira ruido (no log da campanha o sinal cai
+    de ~0.50 para ~0.45 ja na 5a operacao). Persistir so o topo mantem a continuacao
+    cross-turn focada nos dominios que a tarefa e DE FATO sobre, sem inflar a lista.
+    """
+    return domains_of(operations[:_TASK_DOMAIN_PERSIST_K])
+
+
+def _sibling_doc(op_id: str, entry: dict, domain: str) -> OperationDoc:
+    op = entry["op"]
+    summary = op.get("summary", op_id)
+    return OperationDoc(
+        operation_id=op_id,
+        method=entry["method"],
+        path=entry["path"],
+        domain=domain,
+        destructive=bool(op.get("x-destructive", False)),
+        summary=summary,
+        full_text=summary,
+        score=0.0,
+    )
+
+
+def _expand_domain_siblings(
+    operations: list[OperationDoc], task_domains: list[str] | None = None
+) -> list[OperationDoc]:
+    """Injeta operacoes-irmas dos dominios tocados, fora do top-k.
+
+    Falso negativo medido em uso real: o retrieval roda UMA vez por
     turno, ancorado no texto ORIGINAL do usuario, e congela a lista de tools. Num
     pedido multi-step ("desmarque as reservas do dia 19") ele traz `reservations.cancel`
     mas nao `reservations.list` — a operacao que o agente precisa para *encontrar*
@@ -254,41 +361,41 @@ def _expand_domain_siblings(operations: list[OperationDoc]) -> list[OperationDoc
     operacoes dele fiquem disponiveis como tool (inclui `reservations.list` e o
     `coupons.assignGroup` da campanha). Em memoria, a partir do spec local — sem rede,
     sem reindex. A barreira de confirmacao no executor segue valendo para as destrutivas.
+
+    Lacuna cross-turn: `task_domains` sao os dominios CENTRAIS que a TAREFA ja
+    tocou em turnos anteriores (persistidos no `ConversationState`). Numa continuacao cujo
+    texto nao menciona o dominio que a tarefa ainda precisa ("faca os passos exceto o
+    contato", sem a palavra "cupom"), `coupons.assignGroup` ficava inalcancavel por DOIS
+    motivos: (a) `coupons` nao era recuperado no turno, ou (b) so a op generica do dominio
+    era recuperada (`coupons.get`) e a irma especifica (`assignGroup`) caia ATRAS do teto,
+    porque `coupons` aparecia tarde na ordem dos dominios. Solucao minima: por os dominios
+    PERSISTIDOS da tarefa NA FRENTE da fila de expansao — assim suas irmas entram antes de
+    o teto se esgotar, cobrindo (a) e (b). O teto (unico) segue limitando o total, entao a
+    lista de tools fica focada (nao explode); e com `task_domains` vazio a ordem e so a dos
+    dominios do turno — comportamento de turno unico IDENTICO ao do retrieval sem estado.
     """
     retrieved = {op.operation_id for op in operations}
-    # dominios na ordem de relevancia (operations ja vem ordenado por score)
-    domains: list[str] = []
-    for op in operations:
-        d = op.operation_id.split(".")[0]
-        if d not in domains:
-            domains.append(d)
+    # dominios persistidos da tarefa PRIMEIRO, depois os recuperados no turno (dedup).
+    ordered: list[str] = []
+    for d in list(task_domains or []) + domains_of(operations):
+        if d not in ordered:
+            ordered.append(d)
 
     by_id = _operations_by_id()
     extra: list[OperationDoc] = []
-    for domain in domains:
+    for domain in ordered:
         for op_id, entry in by_id.items():
             if len(extra) >= _DOMAIN_EXPANSION_CAP:
                 return extra
             if op_id in retrieved or op_id.split(".")[0] != domain:
                 continue
-            op = entry["op"]
-            summary = op.get("summary", op_id)
-            extra.append(
-                OperationDoc(
-                    operation_id=op_id,
-                    method=entry["method"],
-                    path=entry["path"],
-                    domain=domain,
-                    destructive=bool(op.get("x-destructive", False)),
-                    summary=summary,
-                    full_text=summary,
-                    score=0.0,
-                )
-            )
+            extra.append(_sibling_doc(op_id, entry, domain))
     return extra
 
 
-def build_tools(retrieval: RetrievalResult) -> tuple[list[dict], dict]:
+def build_tools(
+    retrieval: RetrievalResult, task_domains: list[str] | None = None
+) -> tuple[list[dict], dict]:
     """Monta as tools (formato OpenAI) e o mapa reverso para o executor.
 
     fn_map[fn_name] = {operation_id, method, path, locations}
@@ -296,12 +403,15 @@ def build_tools(retrieval: RetrievalResult) -> tuple[list[dict], dict]:
     que ja esta no base_url do client.
 
     Alem do top-k recuperado, injeta (a) as operacoes-irmas dos dominios tocados
-    (anti-falso-negativo) e (b) a calculadora local (sempre disponivel).
+    no turno e dos dominios PERSISTIDOS da tarefa (`task_domains` — anti-falso-negativo
+    e fecha a lacuna cross-turn) e (b) a calculadora local (sempre disponivel).
     """
     tools: list[dict] = []
     fn_map: dict[str, dict] = {}
 
-    operations = list(retrieval.operations) + _expand_domain_siblings(retrieval.operations)
+    operations = list(retrieval.operations) + _expand_domain_siblings(
+        retrieval.operations, task_domains
+    )
     for op in operations:
         op_id = op.operation_id
         fn_name = op_id.replace(".", "_")  # OpenAI exige ^[a-zA-Z0-9_-]+$
