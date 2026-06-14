@@ -1,4 +1,4 @@
-"""Classificador DETERMINISTICO de operacoes que exigem confirmacao (Dia 3).
+"""Classificador DETERMINISTICO de operacoes que exigem confirmacao.
 
 A regra do CLAUDE.md e inviolavel: destrutividade/alto impacto e decidida por
 metadado do spec + allowlist explicita, NUNCA por LLM. Uma operacao exige
@@ -14,9 +14,9 @@ confirmacao se cair em qualquer uma das duas classes:
   consequencia real para muita gente, mas SEM marca `x-destructive`. Mantida como
   allowlist pequena e explicita, justificada por inspeccao do spec.
 
-A barreira (Dia 3) migrou do retrieval para o executor: o retrieval volta a
-incluir as destrutivas (senao a tool nem estaria disponivel) e a confirmacao
-acontece no boundary da tool-call, imediatamente antes do `client.request`.
+A barreira fica no executor, nao no retrieval: o retrieval inclui as destrutivas
+(senao a tool nem estaria disponivel) e a confirmacao acontece no boundary da
+tool-call, imediatamente antes do `client.request`.
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ def requires_confirmation(operation_id: str) -> bool:
 
 
 def confirmation_reason(operation_id: str) -> str:
-    """Motivo da confirmacao em LINGUAGEM DE OPERADOR (Dia 6) — compoe o plano.
+    """Motivo da confirmacao em LINGUAGEM DE OPERADOR — compoe o plano.
 
     A CLASSE (x-destructive / efeito em massa) segue decidida por metadado, igual.
     Muda so a redacao: nada de "x-destructive" na fala ao operador.

@@ -82,8 +82,8 @@ uv run pytest -m live    # variantes ao vivo: LLM + API reais (lê o .env)
 
 A suíte offline cobre as 6 tarefas sem rede (dublês `StubLLM`/`FakeClient`); as variantes
 `live` exercitam o caminho real. Checagens ao vivo prontas para demo:
-`scripts/safety_check.py` (confirmação/ambiguidade, Dia 3) e `scripts/tasks_check.py`
-(multi-step das Tarefas 2/3/5, Dia 4).
+`scripts/safety_check.py` (confirmação/ambiguidade) e `scripts/tasks_check.py`
+(multi-step das Tarefas 2/3/5).
 
 ## Arquitetura
 
@@ -118,15 +118,13 @@ loop replaneja.
 
 ## Decisões de design (uma linha cada)
 
-- **Single-agent ReAct, sem framework** — menor latência e superfície de bug que orquestração multi-agente para 61 operações. (`Context/design-document-dionisio.md` §2.1)
-- **RAG sobre o OpenAPI spec** — o LLM nunca vê as 61 (logo, nem as 600) operações, só o top-k recuperado; é a resposta de escalabilidade. (design doc §2.2, §6)
-- **Embeddings locais multilíngues por padrão** — o OpenRouter não tem endpoint de embeddings e o corpus/queries são em PT; `openai` é opt-in. (`History/dia_1.md` §3)
-- **Texto embedado = uma frase curta de intenção** ("Use when"); detalhes técnicos ficam no metadado `detail`. O embedder local dilui textos longos. (`History/dia_1.md` §3.5)
-- **Destrutividade por metadado do spec** (`x-destructive`), nunca por LLM; a barreira é a confirmação no executor. (`History/dia_3.md`)
-- **Multi-step é emergente** — reusa `discovered_entities` + histórico; sem planner-JSON nem sub-agentes. (`History/dia_4.md`)
-
-Histórico dia a dia em `History/dia_N.md`; arquitetura e trade-offs completos em
-`Context/design-document-dionisio.md`.
+- **Single-agent ReAct, sem framework** — menor latência e superfície de bug que orquestração multi-agente para 61 operações.
+- **RAG sobre o OpenAPI spec** — o LLM nunca vê as 61 (logo, nem as 600) operações, só o top-k recuperado; é a resposta de escalabilidade.
+- **Embeddings locais multilíngues por padrão** — o OpenRouter não tem endpoint de embeddings e o corpus/queries são em PT; `openai` é opt-in.
+- **Texto embedado = uma frase curta de intenção** ("Use when"); detalhes técnicos ficam no metadado `detail`. O embedder local dilui textos longos.
+- **Destrutividade por metadado do spec** (`x-destructive`), nunca por LLM; a barreira é a confirmação no executor.
+- **Multi-step é emergente** — reusa `discovered_entities` + histórico; sem planner-JSON nem sub-agentes.
+- **Cobertura por turno** — dicas curadas no índice + persistência de domínio cross-turn (`task_domains`) garantem que cada operação esteja alcançável quando o pedido a exige; veja `scripts/coverage_check.py`.
 
 ## Convenções (não violar)
 

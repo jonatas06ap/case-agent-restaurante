@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""CLI interativo do agente do Dionisio (Dia 2).
+"""CLI interativo do agente do Dionisio.
 
 Loop de input/output no terminal, mantendo UM ConversationState ao longo da sessao
 (multi-turno). Mostra de forma enxuta o que o agente fez (retrieval + tool calls) — util

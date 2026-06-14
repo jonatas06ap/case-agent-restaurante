@@ -1,4 +1,4 @@
-"""Camada de seguranca do agente (Dia 3).
+"""Camada de seguranca do agente.
 
 Dois mecanismos, com responsabilidades separadas:
 

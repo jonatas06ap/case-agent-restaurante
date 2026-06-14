@@ -1,4 +1,4 @@
-"""Suíte das 6 tarefas do case (Dia 4).
+"""Suíte das 6 tarefas do case.
 
 Núcleo OFFLINE e DETERMINÍSTICO: o LLM (`StubLLM`) e a API (`FakeClient`) são
 mockados, mas o loop ReAct, o executor, a barreira de confirmação e o fluxo de
@@ -65,7 +65,7 @@ def make_agent(stub, op_ids, client, confirm_callback=None):
 
 
 # ===========================================================================
-# Tarefa 1 — contar reservas de hoje (regressão Dia 2)
+# Tarefa 1 — contar reservas de hoje
 # ===========================================================================
 async def test_tarefa1_conta_reservas_de_hoje():
     stub = StubLLM(script=[
@@ -239,7 +239,7 @@ async def test_tarefa3_filtro_composto_intersecao():
 
 
 # ===========================================================================
-# Tarefa 4 — campanha (assignGroup) só dispara após confirmação (reuso Dia 3)
+# Tarefa 4 — campanha (assignGroup) só dispara após confirmação
 # ===========================================================================
 _T4_OPS = ["clients.inactive", "coupons.create", "coupons.assignGroup"]
 
@@ -372,7 +372,7 @@ async def test_tarefa6_ambiguo_pergunta_sem_chamar_api():
 
 
 # ===========================================================================
-# Regressão Dia 2 — DionisioAPIError vira observação textual e o loop se recupera
+# DionisioAPIError vira observação textual e o loop se recupera
 # ===========================================================================
 async def test_erro_de_api_vira_observacao_e_loop_recupera():
     calls = {"n": 0}

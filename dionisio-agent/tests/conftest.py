@@ -1,4 +1,4 @@
-"""Fixtures e dublês de teste (Dia 4).
+"""Fixtures e dublês de teste.
 
 O objetivo é tornar o multi-step DETERMINÍSTICO e OFFLINE: mockamos as duas
 fronteiras não-determinísticas do agente — o LLM (OpenRouter) e a API (rede) —

@@ -1,8 +1,8 @@
-"""Dia 6 — confiabilidade: cálculo determinístico, falsos negativos e linguagem.
+"""Confiabilidade: cálculo determinístico, falsos negativos e linguagem.
 
 Offline e determinístico (mesmo princípio do `test_tasks.py`): o loop, o executor,
 o planner e a safety são os reais; só o LLM (`StubLLM`) e a API (`FakeClient`) são
-dublês. Cobre as três frentes do dia:
+dublês. Cobre três frentes:
 
 - Fix A: a tool `calcular` é local, sempre presente, e dá o número exato.
 - Fix B: a expansão de domínio traz a operação-irmã que o retrieval não trouxe;
@@ -35,8 +35,8 @@ from tests.conftest import (
 # ===========================================================================
 # Fix A — calculadora determinística
 # ===========================================================================
-def test_calculadora_percentual_corrige_erro_da_simulacao():
-    # Na simulação o LLM disse 53%; o correto é 55%.
+def test_calculadora_percentual_corrige_erro_do_llm():
+    # Em uso real o LLM disse 53%; o correto é 55%.
     out = json.loads(calculator.execute({"op": "percentual", "parte": 71, "total": 129}))
     assert out["resultado_pct"] == 55.0
 

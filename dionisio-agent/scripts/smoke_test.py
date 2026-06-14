@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""Smoke test do Dia 1 — valida DionisioClient + Retriever de ponta a ponta.
+"""Smoke test — valida DionisioClient + Retriever de ponta a ponta.
 
-Criterio de conclusao do Dia 1: 7/7 checks passando contra a API real.
+Alvo: 7/7 checks passando contra a API real (sem tocar no LLM).
 
 Uso:
     uv run python scripts/smoke_test.py

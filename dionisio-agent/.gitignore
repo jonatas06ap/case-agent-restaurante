@@ -5,3 +5,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+coverage_report.md
+ROTEIRO_VIDEO.md
+DEMO.md

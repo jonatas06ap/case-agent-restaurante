@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""Checagem ao vivo das tarefas multi-step do Dia 4 (LLM + API reais).
+"""Checagem ao vivo das tarefas multi-step (LLM + API reais).
 
-Complementa o `safety_check.py` (Dia 3) exercitando ponta a ponta as três tarefas
+Complementa o `safety_check.py` exercitando ponta a ponta as três tarefas
 que encadeiam operações:
 
   2) Remarcar reserva (search -> list -> availability -> reschedule + confirmação;

@@ -1,6 +1,6 @@
-"""Detector de ambiguidade por LLM (Dia 3) — resposta JSON estruturada.
+"""Detector de ambiguidade por LLM — resposta JSON estruturada.
 
-Roda UMA vez por turno, ANTES do loop ReAct (design doc §5 passo 2). Objetivo:
+Roda UMA vez por turno, ANTES do loop ReAct. Objetivo:
 quando o pedido ja nasce ambiguo (multiplas interpretacoes que mudam a acao) ou
 falta um dado essencial que so o operador pode dar, devolver UMA pergunta de
 esclarecimento e encerrar o turno — em vez de gastar tool calls para descobrir,
@@ -12,7 +12,7 @@ Decisoes de robustez:
 - Usa o historico (`state.messages`) para resolver referencias: "cancela a
   reserva dele" nao e ambiguo se o turno anterior ja fixou quem e "ele".
 - Parse JSON tolerante: o modelo pode embrulhar o JSON em texto ou ```json. Em
-  qualquer falha de parse, degrada para NAO ambiguo (comportamento do Dia 2) —
+  qualquer falha de parse, degrada para NAO ambiguo (segue o fluxo normal do turno) —
   nunca derruba o turno.
 - temperatura 0, SEM tools nesta chamada.
 
@@ -96,8 +96,8 @@ def _parse_verdict(text: str) -> dict:
 async def detect_ambiguity(user_input: str, state, llm) -> dict:
     """Classifica o pedido. Retorna {"ambiguous": bool, "clarifying_question": str|None}.
 
-    Falha graciosa: qualquer erro (LLM/rede/parse) -> nao ambiguo (degrada para o
-    comportamento do Dia 2), nunca derruba o turno.
+    Falha graciosa: qualquer erro (LLM/rede/parse) -> nao ambiguo (segue o fluxo
+    normal do turno), nunca derruba o turno.
     """
     messages = [
         {"role": "system", "content": _SYSTEM},

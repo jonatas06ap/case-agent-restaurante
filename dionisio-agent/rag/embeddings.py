@@ -5,7 +5,7 @@ senao os vetores ficam em espacos diferentes e o retrieval retorna lixo.
 
 Default = embeddings locais (all-MiniLM via ChromaDB): offline, gratis, sem key.
 Opt-in = OpenAI text-embedding-3-small (requer EMBEDDING_PROVIDER=openai + OPENAI_API_KEY).
-OpenRouter NAO oferece endpoint de embeddings — serve apenas ao LLM (Dia 2+).
+OpenRouter NAO oferece endpoint de embeddings — serve apenas ao LLM do agente.
 """
 
 from __future__ import annotations
